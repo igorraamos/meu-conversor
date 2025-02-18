@@ -1,23 +1,31 @@
 {
-  "name": "projeto-conversor",
+  "name": "meu-conversor",
   "version": "1.0.0",
-  "description": "Conversor de moedas com foco em SEO",
-  "main": "index.html",
+  "description": "Conversor de moedas com cotação em tempo real",
+  "type": "module",
   "scripts": {
-    "start": "serve .",
-    "build": "echo 'No build required'"
+    "dev": "serve -s . -p 3000",
+    "start": "serve -s . -p 3000"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/igorraamos/meu-conversor.git"
   },
   "keywords": [
     "conversor",
     "moedas",
-    "câmbio"
+    "cambio"
   ],
-  "author": "igorraamos",
-  "license": "MIT",
-  "dependencies": {
-    "serve": "^14.0.0"
+  "author": "Igor Ramos",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/igorraamos/meu-conversor/issues"
   },
-  "engines": {
-    "node": ">=18.0.0"
+  "homepage": "https://github.com/igorraamos/meu-conversor#readme",
+  "dependencies": {
+    "dotenv": "^16.4.1"
+  },
+  "devDependencies": {
+    "serve": "^14.2.1"
   }
 }
