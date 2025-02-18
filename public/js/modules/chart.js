@@ -1,4 +1,4 @@
-import { fetchHistoricalRate } from './api.js';
+import { getHistoricalRates } from './api.js';
 
 let chart;
 
@@ -8,18 +8,13 @@ const CHART_CONFIG = {
         background: 'rgba(92, 184, 92, 0.2)',
         tooltipBg: 'rgba(51, 51, 51, 0.8)',
         textColor: '#5a5a5a'
-    },
-    periods: {
-        '7d': { days: 7, interval: 1 },
-        '1m': { days: 30, interval: 1 },
-        '6m': { days: 180, interval: 6 },
-        '1y': { days: 365, interval: 12 }
     }
 };
 
 function getChartOptions() {
     return {
         responsive: true,
+        maintainAspectRatio: false,
         plugins: {
             legend: { display: false },
             tooltip: {
@@ -28,125 +23,89 @@ function getChartOptions() {
                 titleColor: '#fff',
                 bodyColor: '#fff',
                 cornerRadius: 6,
-                padding: { top: 6, right: 10, bottom: 6, left: 10 },
+                padding: 10,
                 displayColors: false,
                 callbacks: {
-                    label: function (tooltipItem) {
-                        const value = `R$ ${tooltipItem.raw.toFixed(2).replace('.', ',')}`
-                        const date = new Date(tooltipItem.label).toLocaleDateString('pt-BR', {
-                            day: '2-digit',
-                            month: 'short',
-                            year: 'numeric',
-                        });
-                        return `${value} ${date}`;
-                    },
-                    title: () => ''
+                    label: function(context) {
+                        const value = context.raw.toFixed(2).replace('.', ',');
+                        return `R$ ${value}`;
+                    }
                 }
             }
         },
         scales: {
             x: {
-                ticks: { display: false },
-                grid: { display: false }
+                type: 'time',
+                time: {
+                    unit: 'day',
+                    displayFormats: {
+                        day: 'dd/MM'
+                    }
+                },
+                ticks: {
+                    source: 'auto',
+                    maxRotation: 0
+                }
             },
             y: {
+                beginAtZero: false,
                 ticks: {
-                    callback: value => `R$ ${value.toFixed(2).replace('.', ',')}`,
-                    font: { size: 12 },
-                    color: CHART_CONFIG.colors.textColor
-                },
-                grid: { drawBorder: false }
-            }
-        },
-        interaction: {
-            mode: 'nearest',
-            intersect: false
-        },
-        elements: {
-            point: {
-                radius: 3,
-                hoverRadius: 6,
-                hoverBorderWidth: 2
+                    callback: value => `R$ ${value.toFixed(2).replace('.', ',')}`
+                }
             }
         }
     };
 }
 
-function adjustChartSize(ctx) {
-    if (window.innerWidth >= 768) {
-        ctx.canvas.width = 652;
-        ctx.canvas.height = 326;
-    } else {
-        ctx.canvas.width = ctx.canvas.offsetWidth;
-        ctx.canvas.height = ctx.canvas.offsetHeight;
-    }
-}
-
-async function getChartData(period) {
-    const endDate = new Date();
-    const startDate = new Date();
-    const { days, interval } = CHART_CONFIG.periods[period] || CHART_CONFIG.periods['7d'];
-    
-    startDate.setDate(endDate.getDate() - days);
-    
-    const labels = [];
-    const dataPoints = [];
-    
-    for (let date = new Date(startDate); date <= endDate; date.setDate(date.getDate() + interval)) {
-        const formattedDate = date.toISOString().split('T')[0];
-        const rate = await fetchHistoricalRate(formattedDate);
-        
-        if (rate) {
-            labels.push(formattedDate);
-            dataPoints.push(rate);
-        }
-    }
-    
-    return { labels, dataPoints };
-}
-
 export async function renderChart(period = '7d') {
     try {
-        const ctx = document.getElementById("chart").getContext("2d");
+        const ctx = document.getElementById('chart').getContext('2d');
         
-        // Limpa o gráfico anterior se existir
         if (chart) {
             chart.destroy();
         }
+
+        const data = await getHistoricalRates(period);
         
-        // Ajusta o tamanho do canvas
-        adjustChartSize(ctx);
-        
-        // Busca os dados
-        const { labels, dataPoints } = await getChartData(period);
-        
-        // Cria o novo gráfico
+        if (!data || data.length < 2) {
+            throw new Error('Dados insuficientes para renderizar o gráfico');
+        }
+
+        const chartData = {
+            labels: data.map(item => item.date),
+            datasets: [{
+                data: data.map(item => item.rate),
+                borderColor: CHART_CONFIG.colors.primary,
+                backgroundColor: CHART_CONFIG.colors.background,
+                fill: true,
+                tension: 0.1
+            }]
+        };
+
         chart = new Chart(ctx, {
-            type: "line",
-            data: {
-                labels,
-                datasets: [{
-                    data: dataPoints,
-                    borderColor: CHART_CONFIG.colors.primary,
-                    backgroundColor: CHART_CONFIG.colors.background,
-                    fill: true,
-                    pointBackgroundColor: CHART_CONFIG.colors.primary,
-                    pointBorderColor: CHART_CONFIG.colors.primary,
-                    pointRadius: 3,
-                    tension: 0
-                }]
-            },
+            type: 'line',
+            data: chartData,
             options: getChartOptions()
         });
+
+        // Calcular e exibir a variação
+        const startRate = data[0].rate;
+        const endRate = data[data.length - 1].rate;
+        const variation = ((endRate - startRate) / startRate) * 100;
         
-        // Adiciona listener para redimensionamento
-        window.addEventListener('resize', () => adjustChartSize(ctx));
-        
+        const variationSpan = document.querySelector(`button[data-period="${period}"] .variation`);
+        if (variationSpan) {
+            variationSpan.textContent = `${variation.toFixed(2)}%`;
+            variationSpan.classList.toggle('positive', variation >= 0);
+            variationSpan.classList.toggle('negative', variation < 0);
+        }
+
     } catch (error) {
         console.error('Erro ao renderizar gráfico:', error);
-        throw new Error('Falha ao renderizar o gráfico');
+        const errorContainer = document.getElementById('error-container');
+        if (errorContainer) {
+            errorContainer.textContent = 'Erro ao carregar o gráfico. Tente novamente mais tarde.';
+            errorContainer.style.display = 'block';
+        }
     }
 }
-
-// Exporta funções que podem ser úteis em outros módulos
-export const getChartPeriods = () => Object.keys(CHART_CONFIG.periods);

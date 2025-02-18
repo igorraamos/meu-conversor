@@ -3,6 +3,7 @@ import { showError } from './modules/utils.js';
 import { preencherTabelaValores } from './modules/table.js';
 import { initInputFormatting, updateConversion } from './modules/converter.js';
 import { updateLocalTime } from './modules/datetime.js';
+import { getHistoricalRates } from './modules/api.js';
 import { CONFIG, THEME, ERROR_MESSAGES } from './config.js';
 
 // Variáveis globais
@@ -11,10 +12,6 @@ const brlInput = document.getElementById("brl-input");
 const toggleThemeButton = document.getElementById("toggle-theme");
 const errorContainer = document.getElementById("error-container");
 
-/**
- * Inicializa o tema da aplicação
- * @param {HTMLElement} button - Botão de alternância do tema
- */
 function initTheme(button) {
     const currentTheme = localStorage.getItem('theme') || 'light';
     document.body.classList.toggle('dark-theme', currentTheme === 'dark');
@@ -28,10 +25,6 @@ function initTheme(button) {
     });
 }
 
-/**
- * Atualiza o tema do gráfico
- * @param {boolean} isDark - Indica se o tema escuro está ativo
- */
 function updateChartTheme(isDark) {
     const theme = isDark ? THEME.DARK : THEME.LIGHT;
     if (window.currentChart) {
@@ -41,10 +34,6 @@ function updateChartTheme(isDark) {
     }
 }
 
-/**
- * Calcula e exibe a variação do período selecionado
- * @param {string} period - Período selecionado (7d, 1m, 6m, 1y)
- */
 async function calcularVariacao(period) {
     try {
         const button = document.querySelector(`button[data-period="${period}"]`);
@@ -68,15 +57,19 @@ async function calcularVariacao(period) {
     }
 }
 
-/**
- * Inicializa os botões do gráfico
- */
 function initChartButtons() {
     const chartButtons = document.querySelectorAll('.chart-buttons button');
+    
+    const defaultButton = document.querySelector('button[data-period="7d"]');
+    if (defaultButton) defaultButton.classList.add('active');
+
     chartButtons.forEach((button) => {
         const period = button.dataset.period;
         button.addEventListener("click", async () => {
             try {
+                chartButtons.forEach(btn => btn.classList.remove('active'));
+                button.classList.add('active');
+                
                 await calcularVariacao(period);
                 await renderChart(period);
             } catch (error) {
@@ -87,50 +80,42 @@ function initChartButtons() {
     });
 }
 
-/**
- * Inicializa o menu de navegação
- */
 function initNavigation() {
     const toggleMoreButton = document.getElementById('toggle-more');
     const extraCoins = document.getElementById('extra-coins');
 
-    toggleMoreButton.addEventListener('click', () => {
-        const isHidden = extraCoins.classList.toggle('hidden');
-        toggleMoreButton.textContent = isHidden ? 'Ver Mais Moedas' : 'Ver Menos';
-    });
+    if (toggleMoreButton && extraCoins) {
+        toggleMoreButton.addEventListener('click', () => {
+            const isHidden = extraCoins.classList.toggle('hidden');
+            toggleMoreButton.textContent = isHidden ? 'Ver Mais Moedas' : 'Ver Menos';
+        });
+    }
 }
 
-// Inicialização da aplicação
 document.addEventListener("DOMContentLoaded", async () => {
     try {
-        // Inicializar hora local
         updateLocalTime();
         setInterval(updateLocalTime, 1000);
 
-        // Inicializar tema
         initTheme(toggleThemeButton);
         
-        // Inicializar conversor
         usdInput.value = "1,00";
         await updateConversion(true);
 
-        // Inicializar tabela e gráfico
         await preencherTabelaValores();
         await renderChart("7d");
         await calcularVariacao("7d");
         
-        // Inicializar formatação de entrada e navegação
         initInputFormatting(usdInput, brlInput);
         initChartButtons();
         initNavigation();
 
     } catch (error) {
         console.error("Erro na inicialização do aplicativo:", error);
-        showError(ERROR_MESSAGES.API_FETCH);
+        showError(ERROR_MESSAGES.GENERAL);
     }
 });
 
-// Service Worker para PWA
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('/public/service-worker.js')

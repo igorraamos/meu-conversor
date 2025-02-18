@@ -1,16 +1,16 @@
-const CACHE_NAME = 'dolar-agora-v1';
+const CACHE_NAME = 'conversor-v1';
 const urlsToCache = [
     '/',
     '/index.html',
     '/public/css/style.css',
     '/public/js/script.js',
     '/public/js/config.js',
+    '/public/js/modules/api.js',
     '/public/js/modules/chart.js',
     '/public/js/modules/converter.js',
     '/public/js/modules/datetime.js',
     '/public/js/modules/table.js',
-    '/public/js/modules/utils.js',
-    '/public/img/dolar-logo.webp'
+    '/public/js/modules/utils.js'
 ];
 
 self.addEventListener('install', event => {
