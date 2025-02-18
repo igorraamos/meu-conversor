@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Veja a cotação atualizada do dólar, converta valores de forma interativa, visualize gráficos e acompanhe o histórico de variações.">
+  <meta name="keywords" content="dólar hoje, cotação do dólar, conversor de moedas, gráfico do dólar, histórico de cotações, USD para BRL">
+  <meta name="author" content="Dólar Agora">
+  <title>Dólar Agora - Conversão e Cotação Atualizada</title>
+  <link rel="stylesheet" href="public/css/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- JSON-LD Schema para SEO -->
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebPage",
+      "name": "Dólar Agora - Conversão e Cotação Atualizada",
+      "description": "Veja a cotação atualizada do dólar, converta valores de forma interativa, visualize gráficos e acompanhe o histórico de variações.",
+      "publisher": {
+        "@type": "Organization",
+        "name": "Dólar Agora",
+        "logo": {
+          "@type": "ImageObject",
+          "url": "https://compartiendoideas.club/dolar-agora/img/dolar-logo.webp"
+        }
+      },
+      "mainEntity": {
+        "@type": "FinancialService",
+        "name": "Conversor de Moedas e Cotações",
+        "serviceType": "Conversor de Moedas",
+        "areaServed": "Global",
+        "offers": {
+          "@type": "Offer",
+          "description": "Conversão atualizada de USD para BRL com gráficos interativos."
+        }
+      },
+      "author": {
+        "@type": "Person",
+        "name": "Dólar Agora"
+      }
+    }
+  </script>
+</head>
+<body>
+  <header>
+    <div class="container">
+      <img src="public/img/dolar-logo.webp" alt="Logo Dólar Agora" class="logo-header">
+      <h1>Dólar Agora</h1>
+      <p>Acompanhe a cotação do dólar em tempo real</p>
+      <div id="local-time">
+        <p>Data e hora local: <span id="local-time-value"></span></p>
+      </div>
+      <button id="toggle-theme" aria-label="Alternar modo noturno">🌙</button>
+    </div>
+  </header>
+
+  <main> 
+    <section class="converter-section">
+      
+      <div class="converter">
+        <div class="input-group">
+          <input type="text" id="usd-input" placeholder="0,00">
+          <span class="currency-prefix">US$</span>
+        </div>
+        <div class="input-group">
+          <input type="text" id="brl-input" placeholder="0,00">
+          <span class="currency-prefix">R$</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Menu de Navegação -->
+    <nav class="modern-menu">
+      <ul id="menu-list">
+        <li><a href="/dolar-agora" class="active">Dólar Agora</a></li>
+        <li><a href="/bitcoin-agora">Bitcoin Agora</a></li>
+        <li><a href="/euro-agora">Euro Agora</a></li>
+        <li><a href="/ouro-agora">Ouro Agora</a></li>
+      </ul>
+      <div id="extra-coins" class="hidden">
+        <div class="category">
+          <h3>Moedas Populares</h3>
+          <ul>
+            <li><a href="/libra-agora">Libra Esterlina</a></li>
+            <li><a href="/iene-agora">Iene Japonês</a></li>
+            <li><a href="/franco-agora">Franco Suíço</a></li>
+          </ul>
+        </div>
+        <div class="category">
+          <h3>Moedas Regionais</h3>
+          <ul>
+            <li><a href="/peso-agora">Peso Argentino</a></li>
+            <li><a href="/real-agora">Real Brasileiro</a></li>
+            <li><a href="/peso-mexicano">Peso Mexicano</a></li>
+          </ul>
+        </div>
+        <div class="category">
+          <h3>Criptomoedas</h3>
+          <ul>
+            <li><a href="/ethereum-agora">Ethereum</a></li>
+            <li><a href="/litecoin-agora">Litecoin</a></li>
+            <li><a href="/bnb-agora">Binance Coin</a></li>
+          </ul>
+        </div>
+      </div>
+      <button id="toggle-more" aria-label="Mostrar mais moedas">Ver Mais Moedas</button>
+    </nav>
+
+    <section class="chart-section">
+      <h2>Gráfico de Variação do Dólar</h2>
+      <canvas id="chart" style="max-width: 100%; height: auto;"></canvas>
+      <div class="chart-buttons">
+        <button data-period="7d">7 dias <span class="variation"></span></button>
+        <button data-period="1m">1 mês <span class="variation"></span></button>
+        <button data-period="6m">6 meses <span class="variation"></span></button>
+        <button data-period="1y">1 ano <span class="variation"></span></button>
+      </div>
+    </section>
+
+    <section class="seo-section">
+      <h2>Sobre o Dólar</h2>
+      <p>O dólar americano (USD) é a moeda oficial dos Estados Unidos e de outros países, como o Timor-Leste, Equador, El Salvador, Panamá e Porto Rico. Ele também é amplamente utilizado em várias regiões do mundo, como as Ilhas Virgens Britânicas, Micronésia, Palau e outros. As moedas incluem 1, 5, 10, 25, 50 centavos e 1 dólar, e as notas variam de 1 a 100 dólares.</p>
+
+      <h3>Diferença entre Dólar Comercial e Dólar Turismo</h3>
+      <p>O dólar comercial é utilizado em transações entre bancos, instituições financeiras e grandes empresas, enquanto o dólar turismo é usado para transações de câmbio entre bancos e pessoas físicas, geralmente com foco em viagens internacionais. A diferença de preço entre compra e venda do dólar comercial é influenciada pelas operações bancárias e pelo lucro dos intermediários.</p>
+
+      <h3>Como a Cotação do Dólar é Influenciada?</h3>
+      <p>A cotação do dólar reflete a economia global, sendo impactada por países como os EUA, China e outras grandes economias. Além disso, fatores como reservas internacionais de dólares e decisões do Banco Central dos EUA influenciam diretamente seu valor. Notícias econômicas, políticas e operações comerciais também são determinantes na variação da moeda.</p>
+
+      <h3>Impacto do Dólar em Viagens e Compras</h3>
+      <p>O preço do dólar afeta diretamente quem planeja viagens ao exterior ou realiza compras de produtos importados, como eletrônicos e roupas de marcas internacionais. Pequenas flutuações no valor do dólar podem fazer a diferença no custo de viagens e no preço de produtos, tanto em lojas físicas quanto online. Para quem deseja economizar, é importante acompanhar a cotação do dólar de forma constante.</p>
+    </section>
+
+    <section class="tabela-valores">
+      <h2>Tabela de Valores em Dólar Convertidos em Real</h2>
+      <table id="valores-dolar">
+        <thead>
+          <tr>
+            <th>Dólar</th>
+            <th>Real</th>
+          </tr>
+        </thead>
+        <tbody>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- Container para mensagens de erro -->
+    <div id="error-container" style="display: none;"></div>
+  </main>
+
+  <footer>
+    <p>&copy; 2025 Dólar Agora. Todos os direitos reservados.</p>
+  </footer>
+
+  <script src="public/js/script.js" type="module"></script>
+</body>
+</html>

@@ -1,0 +1,23 @@
+{
+  "name": "projeto-conversor",
+  "version": "1.0.0",
+  "description": "Conversor de moedas com foco em SEO",
+  "main": "index.html",
+  "scripts": {
+    "start": "serve .",
+    "build": "echo 'No build required'"
+  },
+  "keywords": [
+    "conversor",
+    "moedas",
+    "câmbio"
+  ],
+  "author": "igorraamos",
+  "license": "MIT",
+  "dependencies": {
+    "serve": "^14.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

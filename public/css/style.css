@@ -1,0 +1,115 @@
+/* ==========================================================================
+   Variáveis CSS
+   ========================================================================== */
+   :root {
+    --primary-color: #004aad;
+    --success-color: #5cb85c;
+    --neutral-color: #f0f0f5;
+    --text-color: #333;
+    --shadow-default: 0 4px 6px rgba(0, 0, 0, 0.1);
+    --border-radius: 10px;
+    --spacing-default: 20px;
+    --max-width-default: 960px;
+  }
+  
+  /* ==========================================================================
+     Gráfico e Botões - Otimizado
+     ========================================================================== */
+  .chart-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-top: var(--spacing-default);
+  }
+  
+  .chart-buttons button {
+    background-color: var(--neutral-color);
+    color: var(--text-color);
+    border: none;
+    padding: 12px var(--spacing-default);
+    font-size: 0.95rem;
+    font-weight: bold;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+    text-align: center;
+    will-change: transform;
+  }
+  
+  .chart-buttons button:hover {
+    transform: scale(1.05);
+    background-color: #e0e0e5;
+  }
+  
+  /* ==========================================================================
+     Tabela de Valores - Otimizado
+     ========================================================================== */
+  .tabela-valores {
+    margin: var(--spacing-default) auto;
+    max-width: var(--max-width-default);
+    padding: 25px;
+    background-color: #ffffff;
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow-default);
+  }
+  
+  /* ==========================================================================
+     Seção SEO - Otimizado
+     ========================================================================== */
+  .seo-section {
+    margin: var(--spacing-default) auto;
+    max-width: var(--max-width-default);
+    background-color: #ffffff;
+    color: #4a4a4a;
+    padding: 25px;
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow-default);
+    text-align: justify;
+  }
+  
+  /* ==========================================================================
+     Media Queries - Otimizado
+     ========================================================================== */
+  @media (max-width: 768px) {
+    .converter-section {
+      max-width: 90%;
+      padding: 15px;
+    }
+  
+    .converter .input-group input {
+      font-size: clamp(1.5rem, 4vw, 2rem);
+      padding: 15px 15px 15px 50px;
+    }
+  
+    .converter .input-group .currency-prefix {
+      font-size: clamp(1.5rem, 4vw, 2rem);
+    }
+  
+    .tabela-valores,
+    .seo-section {
+      margin: 15px;
+      padding: 15px;
+    }
+  }
+  
+  /* ==========================================================================
+     Performance Optimizations
+     ========================================================================== */
+  @media (prefers-reduced-motion: reduce) {
+    * {
+      animation: none !important;
+      transition: none !important;
+    }
+  }
+  
+  @media print {
+    .chart-buttons {
+      display: none;
+    }
+  
+    .tabela-valores,
+    .seo-section {
+      box-shadow: none;
+      margin: 20px 0;
+    }
+  }
