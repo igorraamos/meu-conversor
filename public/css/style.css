@@ -5,16 +5,209 @@
     --primary-color: #004aad;
     --success-color: #5cb85c;
     --neutral-color: #f0f0f5;
-    --text-color: #333;
+    --text-color: #36454F;
+    --text-light: #E0E0E0;
+    --bg-light: #F8F8F8;
+    --bg-dark: #121212;
+    --bg-dark-header: #1F1F1F;
     --shadow-default: 0 4px 6px rgba(0, 0, 0, 0.1);
     --border-radius: 10px;
     --spacing-default: 20px;
     --max-width-default: 960px;
+    --header-color: #475F5A;
+    --hover-color: #ffa726;
   }
   
-  /* ==========================================================================
-     Gráfico e Botões - Otimizado
-     ========================================================================== */
+  /* Reset básico */
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+  
+  /* Estilos base */
+  body {
+    font-family: Arial, sans-serif;
+    line-height: 1.6;
+    color: var(--text-color);
+    background-color: var(--bg-light);
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+  
+  /* Modo escuro */
+  body.dark-theme {
+    background-color: var(--bg-dark);
+    color: var(--text-light);
+  }
+  
+  .dark-theme header {
+    background-color: var(--bg-dark-header);
+  }
+  
+  /* Cabeçalho */
+  header {
+    text-align: center;
+    background-color: var(--neutral-color);
+    padding: var(--spacing-default) 0;
+    box-shadow: var(--shadow-default);
+  }
+  
+  header .container {
+    max-width: var(--max-width-default);
+    margin: 0 auto;
+  }
+  
+  .logo-header {
+    display: block;
+    margin: 0 auto 10px;
+    width: 150px;
+    height: 150px;
+  }
+  
+  header h1 {
+    font-size: 2.2rem;
+    margin-bottom: 5px;
+    color: var(--header-color);
+    font-weight: bold;
+  }
+  
+  header p {
+    font-size: 1rem;
+    color: #6c757d;
+  }
+  
+  /* Botão para alternar tema */
+  #toggle-theme {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1.5rem;
+    color: inherit;
+    transition: transform 0.3s ease;
+  }
+  
+  #toggle-theme:hover {
+    transform: scale(1.2);
+    color: var(--hover-color);
+  }
+  
+  /* Menu Moderno */
+  .modern-menu {
+    margin: var(--spacing-default) auto 10px;
+  }
+  
+  .modern-menu ul {
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--spacing-default);
+    margin: 0;
+    padding: 0;
+  }
+  
+  .modern-menu ul li a {
+    text-decoration: none;
+    color: var(--primary-color);
+    font-size: 1rem;
+    font-weight: bold;
+    transition: color 0.3s;
+  }
+  
+  .modern-menu ul li a:hover {
+    color: var(--hover-color);
+  }
+  
+  .modern-menu ul li a.active {
+    color: var(--success-color);
+    border-bottom: 2px solid var(--success-color);
+    padding-bottom: 5px;
+  }
+  
+  /* Botão Ver Mais/Menos */
+  #toggle-more {
+    background-color: var(--primary-color);
+    color: #fff;
+    border: none;
+    padding: 15px 35px;
+    font-size: 1.1rem;
+    font-weight: bold;
+    border-radius: 5px;
+    cursor: pointer;
+    margin: 10px auto;
+    display: block;
+    transition: background-color 0.3s ease, transform 0.2s ease;
+  }
+  
+  #toggle-more:hover {
+    background-color: var(--success-color);
+    transform: scale(1.05);
+  }
+  
+  /* Moedas Extras */
+  #extra-coins.hidden {
+    display: none;
+  }
+  
+  /* Conversor de Moedas */
+  .converter-section {
+    padding: var(--spacing-default);
+    background: #ffffff;
+    margin: var(--spacing-default) auto;
+    max-width: 600px;
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow-default);
+    text-align: center;
+  }
+  
+  .converter .input-group {
+    position: relative;
+    margin: 15px auto;
+    width: 100%;
+    max-width: 400px;
+  }
+  
+  .converter .input-group input {
+    width: 100%;
+    padding: 15px 15px 15px 60px;
+    font-size: 2.5rem;
+    font-weight: bold;
+    text-align: right;
+    border: 2px solid var(--success-color);
+    border-radius: 8px;
+    background-color: #eaf9ea;
+    color: #004d00;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+  }
+  
+  .converter .input-group input:focus {
+    border-color: var(--primary-color);
+    background-color: #d8f5d8;
+    outline: none;
+    box-shadow: 0 0 6px rgba(0, 74, 173, 0.3);
+  }
+  
+  .converter .input-group input[readonly] {
+    background-color: #f0f7f0;
+    cursor: not-allowed;
+  }
+  
+  .converter .input-group .currency-prefix {
+    position: absolute;
+    left: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 2.5rem;
+    font-weight: bold;
+    color: #004d00;
+    pointer-events: none;
+  }
+  
+  /* Botões do Gráfico */
   .chart-buttons {
     display: flex;
     justify-content: center;
@@ -31,19 +224,39 @@
     font-weight: bold;
     border-radius: 8px;
     cursor: pointer;
-    transition: transform 0.2s ease;
+    transition: background-color 0.3s, transform 0.2s;
     text-align: center;
-    will-change: transform;
   }
   
   .chart-buttons button:hover {
-    transform: scale(1.05);
     background-color: #e0e0e5;
+    transform: scale(1.05);
   }
   
-  /* ==========================================================================
-     Tabela de Valores - Otimizado
-     ========================================================================== */
+  .chart-buttons button.active {
+    background-color: var(--header-color);
+    color: #fff;
+    transform: scale(1.1);
+    box-shadow: var(--shadow-default);
+  }
+  
+  /* Variações */
+  .variation {
+    display: block;
+    font-size: 0.9rem;
+    font-weight: bold;
+    margin-top: 5px;
+  }
+  
+  .variation.negative {
+    color: #d9534f;
+  }
+  
+  .variation.positive {
+    color: var(--success-color);
+  }
+  
+  /* Tabela */
   .tabela-valores {
     margin: var(--spacing-default) auto;
     max-width: var(--max-width-default);
@@ -53,23 +266,59 @@
     box-shadow: var(--shadow-default);
   }
   
-  /* ==========================================================================
-     Seção SEO - Otimizado
-     ========================================================================== */
+  .tabela-valores h2 {
+    font-size: 1.8rem;
+    margin-bottom: 15px;
+    text-align: center;
+    color: var(--header-color);
+  }
+  
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+  }
+  
+  th, td {
+    padding: 10px;
+    text-align: center;
+    border: 1px solid #ddd;
+  }
+  
+  th {
+    background: var(--success-color);
+    color: #fff;
+  }
+  
+  tbody tr:nth-child(even) {
+    background: #f9f9f9;
+  }
+  
+  /* Seção SEO */
   .seo-section {
     margin: var(--spacing-default) auto;
     max-width: var(--max-width-default);
     background-color: #ffffff;
-    color: #4a4a4a;
     padding: 25px;
     border-radius: var(--border-radius);
     box-shadow: var(--shadow-default);
     text-align: justify;
   }
   
-  /* ==========================================================================
-     Media Queries - Otimizado
-     ========================================================================== */
+  .seo-section h2 {
+    font-size: 1.8rem;
+    text-align: center;
+    margin-bottom: var(--spacing-default);
+    color: var(--header-color);
+  }
+  
+  .seo-section p {
+    font-size: 1rem;
+    line-height: 1.8;
+    margin-bottom: 15px;
+  }
+  
+  /* Responsividade */
   @media (max-width: 768px) {
     .converter-section {
       max-width: 90%;
@@ -92,9 +341,7 @@
     }
   }
   
-  /* ==========================================================================
-     Performance Optimizations
-     ========================================================================== */
+  /* Otimizações de Performance */
   @media (prefers-reduced-motion: reduce) {
     * {
       animation: none !important;
@@ -102,6 +349,7 @@
     }
   }
   
+  /* Otimizações para Impressão */
   @media print {
     .chart-buttons {
       display: none;
