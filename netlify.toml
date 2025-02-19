@@ -6,21 +6,6 @@
 
 # Redirecionamentos da API
 [[redirects]]
-  from = "/.netlify/functions/exchange-rate"
-  to = "/.netlify/functions/exchange-rate"
-  status = 200
-  force = true
-  headers = {Access-Control-Allow-Origin = "*"}
-
-[[redirects]]
-  from = "/.netlify/functions/historical-rate/*"
-  to = "/.netlify/functions/historical-rate/:splat"
-  status = 200
-  force = true
-  headers = {Access-Control-Allow-Origin = "*"}
-
-# Redirecionamentos alternativos para compatibilidade
-[[redirects]]
   from = "/api/exchange-rate"
   to = "/.netlify/functions/exchange-rate"
   status = 200
@@ -61,41 +46,19 @@
     [headers.values]
     Content-Type = "text/css"
     Cache-Control = "public, max-age=31536000"
-    Access-Control-Allow-Origin = "*"
 
 [[headers]]
   for = "/js/*"
     [headers.values]
     Content-Type = "application/javascript"
     Cache-Control = "public, max-age=31536000"
-    Access-Control-Allow-Origin = "*"
 
 [[headers]]
   for = "/img/*"
     [headers.values]
     Cache-Control = "public, max-age=31536000"
-    Access-Control-Allow-Origin = "*"
 
 # Configurações das funções Netlify
 [functions]
   node_bundler = "esbuild"
   external_node_modules = ["node-fetch"]
-  included_files = ["netlify/functions/**/*"]
-
-# Configurações de deploy
-[build.processing]
-  skip_processing = false
-
-[build.processing.css]
-  bundle = true
-  minify = true
-
-[build.processing.js]
-  bundle = true
-  minify = true
-
-[build.processing.html]
-  pretty_urls = true
-
-[build.processing.images]
-  compress = true
