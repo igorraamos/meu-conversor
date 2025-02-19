@@ -3,6 +3,7 @@ node_modules/
 
 # Environment variables
 .env
+.netlify
 .env.*
 *.env
 .env.local
