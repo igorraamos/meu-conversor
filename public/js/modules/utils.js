@@ -1,56 +1,44 @@
-export function showError(message, duration = 5000) {
-    const errorContainer = document.getElementById('error-container');
-    if (!errorContainer) return;
+export function formatNumber(value) {
+    if (typeof value !== 'number' || isNaN(value)) return "0,00";
+    return value.toLocaleString('pt-BR', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    });
+}
 
-    errorContainer.textContent = message;
-    errorContainer.style.display = 'block';
-    errorContainer.classList.add('show-error');
+export function unformatNumber(value) {
+    if (!value) return 0;
+    return parseFloat(value.replace(/\./g, '').replace(',', '.')) || 0;
+}
 
-    setTimeout(() => {
-        errorContainer.classList.remove('show-error');
+export function showError(message) {
+    const errorContainer = document.getElementById("error-container");
+    if (errorContainer) {
+        errorContainer.textContent = message;
+        errorContainer.style.display = "block";
         setTimeout(() => {
-            errorContainer.style.display = 'none';
-        }, 300);
-    }, duration);
+            errorContainer.style.display = "none";
+        }, 5000);
+    }
 }
 
-export function valorMonetarioParaExtenso(valor, moeda) {
-    const inteiro = Math.floor(valor);
-    const centavos = Math.round((valor - inteiro) * 100);
-    
-    let resultado = [];
-    
-    if (inteiro > 0) {
-        const extensoInteiro = numeroParaExtenso(inteiro);
-        resultado.push(inteiro === 1 
-            ? `${extensoInteiro} ${moeda === 'USD' ? 'dólar' : 'real'}`
-            : `${extensoInteiro} ${moeda === 'USD' ? 'dólares' : 'reais'}`);
+export function updateLocalTime() {
+    const localTimeElement = document.getElementById("local-time-value");
+    if (localTimeElement) {
+        const now = new Date();
+        localTimeElement.textContent = now.toLocaleString("pt-BR", {
+            day: "2-digit",
+            month: "long",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+        });
     }
-    
-    if (centavos > 0) {
-        const extensoCentavos = numeroParaExtenso(centavos);
-        if (inteiro > 0) resultado.push("e");
-        resultado.push(centavos === 1 ? `${extensoCentavos} centavo` : `${extensoCentavos} centavos`);
-    }
-    
-    return resultado.join(" ");
 }
 
-function numeroParaExtenso(numero) {
-    const unidades = ["", "um", "dois", "três", "quatro", "cinco", "seis", "sete", "oito", "nove"];
-    const dezenas = ["", "dez", "vinte", "trinta", "quarenta", "cinquenta", "sessenta", "setenta", "oitenta", "noventa"];
-    const especiais = {
-        "11": "onze", "12": "doze", "13": "treze", "14": "quatorze", "15": "quinze",
-        "16": "dezesseis", "17": "dezessete", "18": "dezoito", "19": "dezenove"
-    };
-
-    if (numero === 0) return "zero";
-    if (numero < 10) return unidades[numero];
-    if (numero in especiais) return especiais[numero];
-    
-    const dezena = Math.floor(numero / 10);
-    const unidade = numero % 10;
-    
-    if (unidade === 0) return dezenas[dezena];
-    return `${dezenas[dezena]} e ${unidades[unidade]}`;
+// Atualizar hora a cada segundo
+export function initializeLocalTime() {
+    updateLocalTime();
+    setInterval(updateLocalTime, 1000);
 }
