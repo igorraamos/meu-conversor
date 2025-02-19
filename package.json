@@ -7,9 +7,11 @@
   "scripts": {
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
+    "build": "npm install",
     "security-check": "npm audit",
     "update-deps": "npm update && npm audit fix",
-    "prestart": "npm audit"
+    "prestart": "npm audit",
+    "netlify-dev": "netlify dev"
   },
   "repository": {
     "type": "git",
@@ -35,7 +37,13 @@
     "node-fetch": "^3.3.2"
   },
   "devDependencies": {
+    "@netlify/functions": "^2.6.0",
+    "@types/node": "^20.11.19",
+    "netlify-cli": "^17.16.2",
     "nodemon": "^3.1.9",
     "serve": "^14.2.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
