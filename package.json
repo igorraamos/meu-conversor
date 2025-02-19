@@ -4,8 +4,8 @@
   "description": "Conversor de moedas com cotação em tempo real",
   "type": "module",
   "scripts": {
-    "dev": "serve -s . -p 3000",
-    "start": "serve -s . -p 3000"
+    "dev": "nodemon server.js",
+    "start": "node server.js"
   },
   "repository": {
     "type": "git",
@@ -23,9 +23,15 @@
   },
   "homepage": "https://github.com/igorraamos/meu-conversor#readme",
   "dependencies": {
-    "dotenv": "^16.4.1"
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.1",
+    "express": "^4.18.2",
+    "express-rate-limit": "^7.1.5",
+    "helmet": "^7.1.0",
+    "node-fetch": "^3.3.2"
   },
   "devDependencies": {
+    "nodemon": "^3.1.9",
     "serve": "^14.2.1"
   }
 }
