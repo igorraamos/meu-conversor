@@ -4,27 +4,49 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import fetch from 'node-fetch';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+// Configure __dirname para módulos ES
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 
-// Aumentar segurança do rate limiting
-const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
+// Configurações de rate limit separadas
+const generalLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutos
     max: 100,
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Muitas requisições, tente novamente mais tarde' }
 });
 
+const historicalLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutos
+    max: 300, // Aumentado para requisições históricas
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Muitas requisições, tente novamente mais tarde' }
+});
+
+// Aplicar rate limiting específico para cada rota
+app.use('/api/exchange-rate', generalLimiter);
+app.use('/api/historical', historicalLimiter);
+
 // Configuração mais restritiva do Helmet
 app.use(helmet({
     contentSecurityPolicy: {
         directives: {
             defaultSrc: ["'self'"],
-            scriptSrc: ["'self'", "'unsafe-inline'"],
+            scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
             styleSrc: ["'self'", "'unsafe-inline'"],
             imgSrc: ["'self'", "data:", "https:"],
-            connectSrc: ["'self'", "https://openexchangerates.org"]
+            connectSrc: ["'self'", "https://openexchangerates.org"],
+            fontSrc: ["'self'", "https:", "data:"],
+            objectSrc: ["'none'"],
+            mediaSrc: ["'none'"],
+            frameSrc: ["'none'"]
         }
     },
     crossOriginEmbedderPolicy: true,
@@ -39,6 +61,9 @@ app.use(cors({
     allowedHeaders: ['Content-Type'],
     maxAge: 3600
 }));
+
+// Servir arquivos estáticos da pasta client
+app.use(express.static(path.join(__dirname, '../client')));
 
 // Cache para respostas
 const cacheControl = (req, res, next) => {
@@ -59,6 +84,23 @@ const validateDate = (req, res, next) => {
     next();
 };
 
+// Cache em memória simples
+const cache = new Map();
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutos
+
+// Função para limpar cache expirado
+const clearExpiredCache = () => {
+    const now = Date.now();
+    for (const [key, value] of cache.entries()) {
+        if (now - value.timestamp > CACHE_DURATION) {
+            cache.delete(key);
+        }
+    }
+};
+
+// Limpar cache expirado a cada minuto
+setInterval(clearExpiredCache, 60 * 1000);
+
 // Rota para taxa atual com cache
 app.get('/api/exchange-rate', cacheControl, async (req, res) => {
     try {
@@ -66,8 +108,15 @@ app.get('/api/exchange-rate', cacheControl, async (req, res) => {
             throw new Error('API key não configurada');
         }
 
+        // Verificar cache
+        const cacheKey = 'current_rate';
+        const cachedData = cache.get(cacheKey);
+        if (cachedData && Date.now() - cachedData.timestamp < CACHE_DURATION) {
+            return res.json(cachedData.data);
+        }
+
         const response = await fetch(
-            `${process.env.API_BASE_URL}/latest.json?app_id=${process.env.EXCHANGE_API_KEY}`,
+            `${process.env.API_BASE_URL}/latest.json?app_id=${process.env.EXCHANGE_API_KEY}&base=USD&symbols=BRL`,
             {
                 headers: {
                     'Accept': 'application/json',
@@ -82,7 +131,23 @@ app.get('/api/exchange-rate', cacheControl, async (req, res) => {
         }
 
         const data = await response.json();
-        res.json(data);
+        
+        // Formatar resposta
+        const formattedData = {
+            rates: {
+                BRL: data.rates?.BRL || null
+            },
+            timestamp: data.timestamp,
+            base: data.base || 'USD'
+        };
+
+        // Atualizar cache
+        cache.set(cacheKey, {
+            data: formattedData,
+            timestamp: Date.now()
+        });
+
+        res.json(formattedData);
     } catch (error) {
         console.error('Erro ao buscar taxa de câmbio:', error);
         res.status(500).json({ error: 'Erro ao buscar taxa de câmbio' });
@@ -97,8 +162,16 @@ app.get('/api/historical/:date', validateDate, cacheControl, async (req, res) =>
         }
 
         const { date } = req.params;
+        
+        // Verificar cache
+        const cacheKey = `historical_${date}`;
+        const cachedData = cache.get(cacheKey);
+        if (cachedData && Date.now() - cachedData.timestamp < CACHE_DURATION) {
+            return res.json(cachedData.data);
+        }
+
         const response = await fetch(
-            `${process.env.API_BASE_URL}/historical/${date}.json?app_id=${process.env.EXCHANGE_API_KEY}`,
+            `${process.env.API_BASE_URL}/historical/${date}.json?app_id=${process.env.EXCHANGE_API_KEY}&base=USD&symbols=BRL`,
             {
                 headers: {
                     'Accept': 'application/json',
@@ -113,11 +186,34 @@ app.get('/api/historical/:date', validateDate, cacheControl, async (req, res) =>
         }
 
         const data = await response.json();
-        res.json(data);
+        
+        // Formatar resposta
+        const formattedData = {
+            rates: {
+                BRL: data.rates?.BRL || null
+            },
+            timestamp: data.timestamp,
+            base: data.base || 'USD',
+            historical: true,
+            date: date
+        };
+
+        // Atualizar cache
+        cache.set(cacheKey, {
+            data: formattedData,
+            timestamp: Date.now()
+        });
+
+        res.json(formattedData);
     } catch (error) {
         console.error('Erro ao buscar dados históricos:', error);
         res.status(500).json({ error: 'Erro ao buscar dados históricos' });
     }
+});
+
+// Rota para todas as outras requisições - Serve o index.html
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, '../client/index.html'));
 });
 
 // Middleware de erro global
