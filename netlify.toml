@@ -1,8 +1,22 @@
 # Configurações de Build
 [build]
-  publish = "client"
+  publish = "."
   command = "npm install"
   functions = "netlify/functions"
+
+# Configuração do ambiente
+[build.environment]
+  NODE_VERSION = "18"
+
+# Configurações das funções Netlify
+[functions]
+  node_bundler = "esbuild"
+  external_node_modules = ["node-fetch"]
+
+[dev]
+  publish = "."
+  port = 8888
+  functionsPort = 9999
 
 # Redirecionamentos da API
 [[redirects]]
@@ -10,14 +24,20 @@
   to = "/.netlify/functions/exchange-rate"
   status = 200
   force = true
-  headers = {Access-Control-Allow-Origin = "*"}
+  [redirects.headers]
+    Access-Control-Allow-Origin = "*"
+    Access-Control-Allow-Methods = "GET, OPTIONS"
+    Access-Control-Allow-Headers = "Content-Type"
 
 [[redirects]]
   from = "/api/historical/*"
   to = "/.netlify/functions/historical-rate/:splat"
   status = 200
   force = true
-  headers = {Access-Control-Allow-Origin = "*"}
+  [redirects.headers]
+    Access-Control-Allow-Origin = "*"
+    Access-Control-Allow-Methods = "GET, OPTIONS"
+    Access-Control-Allow-Headers = "Content-Type"
 
 # Redirecionamento SPA (deve ser o último)
 [[redirects]]
@@ -25,40 +45,41 @@
   to = "/index.html"
   status = 200
 
-# Configuração do ambiente
-[build.environment]
-  NODE_VERSION = "18"
-
 # Headers globais
 [[headers]]
   for = "/*"
-    [headers.values]
+  [headers.values]
     Access-Control-Allow-Origin = "*"
     X-Frame-Options = "DENY"
     X-XSS-Protection = "1; mode=block"
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
-    Cache-Control = "no-cache, no-store, must-revalidate"
+    Content-Security-Policy = "default-src 'self' https://openexchangerates.org; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://openexchangerates.org;"
 
-# Headers específicos para arquivos estáticos
+# Headers para arquivos estáticos
 [[headers]]
-  for = "/css/*"
-    [headers.values]
-    Content-Type = "text/css"
-    Cache-Control = "public, max-age=31536000"
-
-[[headers]]
-  for = "/js/*"
-    [headers.values]
+  for = "/*.js"
+  [headers.values]
     Content-Type = "application/javascript"
     Cache-Control = "public, max-age=31536000"
 
 [[headers]]
-  for = "/img/*"
-    [headers.values]
+  for = "/*.css"
+  [headers.values]
+    Content-Type = "text/css"
     Cache-Control = "public, max-age=31536000"
 
-# Configurações das funções Netlify
-[functions]
-  node_bundler = "esbuild"
-  external_node_modules = ["node-fetch"]
+[[headers]]
+  for = "/*.png"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000"
+
+[[headers]]
+  for = "/*.jpg"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000"
+
+[[headers]]
+  for = "/*.svg"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000"
