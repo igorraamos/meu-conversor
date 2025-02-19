@@ -1,20 +1,45 @@
+# Configurações de Build
 [build]
   publish = "client"
   command = "npm install"
+  functions = "netlify/functions"
 
+# Redirecionamentos da API
+[[redirects]]
+  from = "/api/exchange-rate"
+  to = "/.netlify/functions/exchange-rate"
+  status = 200
+  force = true
+  headers = {Access-Control-Allow-Origin = "*"}
+
+[[redirects]]
+  from = "/api/historical/*"
+  to = "/.netlify/functions/historical-rate"
+  status = 200
+  force = true
+  headers = {Access-Control-Allow-Origin = "*"}
+
+# Redirecionamento SPA (deve ser o último)
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
 
+# Configuração do ambiente
 [build.environment]
   NODE_VERSION = "18"
 
+# Headers globais
 [[headers]]
   for = "/*"
     [headers.values]
     Access-Control-Allow-Origin = "*"
+    X-Frame-Options = "DENY"
+    X-XSS-Protection = "1; mode=block"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
 
+# Headers específicos para arquivos estáticos
 [[headers]]
   for = "/css/*"
     [headers.values]
@@ -31,3 +56,8 @@
   for = "/img/*"
     [headers.values]
     Cache-Control = "public, max-age=31536000"
+
+# Configurações de função
+[functions]
+  node_bundler = "esbuild"
+  external_node_modules = ["node-fetch"]
