@@ -2,17 +2,12 @@
   "name": "meu-conversor",
   "version": "1.0.0",
   "description": "Conversor de moedas com cotação em tempo real",
-  "type": "commonjs",
-  "main": "src/server.js",
+  "main": "index.html",
   "scripts": {
-    "dev": "netlify dev",
-    "start": "node src/server.js",
-    "build": "npm install",
-    "security-check": "npm audit",
-    "update-deps": "npm update && npm audit fix",
-    "prestart": "npm audit",
-    "netlify-dev": "netlify dev",
-    "functions": "netlify functions:serve"
+    "dev": "live-server",
+    "start": "live-server",
+    "build": "echo 'No build step required'",
+    "netlify": "netlify dev"
   },
   "repository": {
     "type": "git",
@@ -21,28 +16,22 @@
   "keywords": [
     "conversor",
     "moedas",
-    "cambio"
+    "câmbio",
+    "cotação",
+    "tempo-real"
   ],
   "author": "Igor Ramos",
-  "license": "ISC",
+  "license": "MIT",
   "bugs": {
     "url": "https://github.com/igorraamos/meu-conversor/issues"
   },
   "homepage": "https://github.com/igorraamos/meu-conversor#readme",
   "dependencies": {
-    "cors": "^2.8.5",
-    "dotenv": "^16.4.1",
-    "express": "^4.18.2",
-    "express-rate-limit": "^7.1.5",
-    "helmet": "^7.1.0",
+    "dotenv": "^16.0.3",
     "node-fetch": "^2.6.9"
   },
   "devDependencies": {
-    "@netlify/functions": "^2.6.0",
-    "@types/node": "^20.11.19",
-    "netlify-cli": "^17.16.2",
-    "nodemon": "^3.1.9",
-    "serve": "^14.2.1"
+    "live-server": "^1.2.2"
   },
   "engines": {
     "node": ">=18.0.0"

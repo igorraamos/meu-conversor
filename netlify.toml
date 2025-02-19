@@ -4,19 +4,18 @@
   command = "npm install"
   functions = "netlify/functions"
 
-# Configuração do ambiente
 [build.environment]
   NODE_VERSION = "18"
 
-# Configurações das funções Netlify
 [functions]
   node_bundler = "esbuild"
   external_node_modules = ["node-fetch"]
 
 [dev]
   publish = "."
-  port = 8888
-  functionsPort = 9999
+  port = 3000
+  targetPort = 3000
+  framework = "#static"
 
 # Redirecionamentos da API
 [[redirects]]
@@ -27,7 +26,6 @@
   [redirects.headers]
     Access-Control-Allow-Origin = "*"
     Access-Control-Allow-Methods = "GET, OPTIONS"
-    Access-Control-Allow-Headers = "Content-Type"
 
 [[redirects]]
   from = "/api/historical/*"
@@ -37,49 +35,14 @@
   [redirects.headers]
     Access-Control-Allow-Origin = "*"
     Access-Control-Allow-Methods = "GET, OPTIONS"
-    Access-Control-Allow-Headers = "Content-Type"
 
-# Redirecionamento SPA (deve ser o último)
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
 
-# Headers globais
 [[headers]]
   for = "/*"
   [headers.values]
     Access-Control-Allow-Origin = "*"
-    X-Frame-Options = "DENY"
-    X-XSS-Protection = "1; mode=block"
-    X-Content-Type-Options = "nosniff"
-    Referrer-Policy = "strict-origin-when-cross-origin"
-    Content-Security-Policy = "default-src 'self' https://openexchangerates.org; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://openexchangerates.org;"
-
-# Headers para arquivos estáticos
-[[headers]]
-  for = "/*.js"
-  [headers.values]
-    Content-Type = "application/javascript"
-    Cache-Control = "public, max-age=31536000"
-
-[[headers]]
-  for = "/*.css"
-  [headers.values]
-    Content-Type = "text/css"
-    Cache-Control = "public, max-age=31536000"
-
-[[headers]]
-  for = "/*.png"
-  [headers.values]
-    Cache-Control = "public, max-age=31536000"
-
-[[headers]]
-  for = "/*.jpg"
-  [headers.values]
-    Cache-Control = "public, max-age=31536000"
-
-[[headers]]
-  for = "/*.svg"
-  [headers.values]
-    Cache-Control = "public, max-age=31536000"
+    Cache-Control = "no-cache"
