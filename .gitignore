@@ -1,9 +1,9 @@
-# Dependencies
+# Dependências
 node_modules/
+package-lock.json
 
-# Environment variables
+# Variáveis de ambiente
 .env
-.netlify
 .env.*
 *.env
 .env.local
@@ -11,20 +11,57 @@ node_modules/
 .env.test
 .env.production
 
-# Logs
+# Arquivos e diretórios do Netlify
+.netlify/
+.netlify/*
+netlify.toml
+
+# Logs e debugging
+logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+.pnpm-debug.log*
 
-# Runtime data
-pids
+# Runtime e cache
+pids/
 *.pid
 *.seed
 *.pid.lock
+.cache/
+.temp/
+dist/
+build/
+.DS_Store
 
-# IDE/Editor folders
+# IDEs e editores
 .idea/
 .vscode/
 *.swp
 *.swo
+*.swn
+*.bak
+*.orig
+*~
+
+# Arquivos de sistema
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Diretórios de coverage e testes
+coverage/
+.nyc_output/
+.jest/
+
+# Arquivos temporários
+tmp/
+temp/
+*.tmp
+*.temp
+
+# Arquivos de configuração local
+.prettierrc
+.eslintcache
+.stylelintcache

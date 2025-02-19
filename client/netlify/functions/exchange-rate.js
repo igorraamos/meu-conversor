@@ -1,9 +1,12 @@
-// Usando ESM em vez de CommonJS
-import fetch from 'node-fetch';
+// Usando CommonJS em vez de ESM para compatibilidade com Netlify Functions
+const fetch = require('node-fetch');
 
-// Usando export default em vez de exports.handler
-export default async function handler(event, context) {
+exports.handler = async function(event, context) {
   try {
+    if (!process.env.API_BASE_URL || !process.env.EXCHANGE_API_KEY) {
+      throw new Error('API configuration missing');
+    }
+
     const response = await fetch(
       `${process.env.API_BASE_URL}/latest.json?app_id=${process.env.EXCHANGE_API_KEY}&base=USD&symbols=BRL`,
       {
@@ -14,7 +17,7 @@ export default async function handler(event, context) {
     );
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      throw new Error(`API responded with status: ${response.status}`);
     }
 
     const data = await response.json();
@@ -28,7 +31,7 @@ export default async function handler(event, context) {
       body: JSON.stringify(data)
     };
   } catch (error) {
-    console.error('Erro na função:', error);
+    console.error('Function error:', error);
     return {
       statusCode: 500,
       headers: {
@@ -36,9 +39,9 @@ export default async function handler(event, context) {
         'Access-Control-Allow-Origin': '*'
       },
       body: JSON.stringify({
-        error: 'Erro ao buscar taxa de câmbio',
-        details: error.message
+        error: 'Internal Server Error',
+        message: error.message
       })
     };
   }
-}
+};

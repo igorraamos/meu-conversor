@@ -1,8 +1,7 @@
-import fetch from 'node-fetch';
+const fetch = require('node-fetch');
 
-export default async function handler(event, context) {
+exports.handler = async function(event, context) {
   try {
-    // Pega a data da URL
     const date = event.path.split('/').pop();
     
     if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
@@ -12,8 +11,12 @@ export default async function handler(event, context) {
           'Content-Type': 'application/json',
           'Access-Control-Allow-Origin': '*'
         },
-        body: JSON.stringify({ error: 'Data inválida' })
+        body: JSON.stringify({ error: 'Invalid date format' })
       };
+    }
+
+    if (!process.env.API_BASE_URL || !process.env.EXCHANGE_API_KEY) {
+      throw new Error('API configuration missing');
     }
 
     const response = await fetch(
@@ -26,7 +29,7 @@ export default async function handler(event, context) {
     );
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      throw new Error(`API responded with status: ${response.status}`);
     }
 
     const data = await response.json();
@@ -40,7 +43,7 @@ export default async function handler(event, context) {
       body: JSON.stringify(data)
     };
   } catch (error) {
-    console.error('Erro na função:', error);
+    console.error('Function error:', error);
     return {
       statusCode: 500,
       headers: {
@@ -48,9 +51,9 @@ export default async function handler(event, context) {
         'Access-Control-Allow-Origin': '*'
       },
       body: JSON.stringify({
-        error: 'Erro ao buscar taxa histórica',
-        details: error.message
+        error: 'Internal Server Error',
+        message: error.message
       })
     };
   }
-}
+};
