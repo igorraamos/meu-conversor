@@ -1,6 +1,9 @@
 import { fetchExchangeRate } from './api.js';
 import { showError } from './utils.js';
 
+/**
+ * Converte número para texto por extenso
+ */
 function numeroParaExtenso(numero) {
     const unidades = ["", "um", "dois", "três", "quatro", "cinco", "seis", "sete", "oito", "nove"];
     const dezenas = ["", "dez", "vinte", "trinta", "quarenta", "cinquenta", "sessenta", "setenta", "oitenta", "noventa"];
@@ -46,6 +49,16 @@ function numeroParaExtenso(numero) {
     return result.join(" ");
 }
 
+/**
+ * Formata valor monetário
+ */
+function formatarMoeda(valor) {
+    return valor.toFixed(2).replace('.', ',');
+}
+
+/**
+ * Preenche a tabela com os valores convertidos
+ */
 export async function preencherTabelaValores() {
     const tabelaValores = document.querySelector('#valores-dolar tbody');
     if (!tabelaValores) {
@@ -54,30 +67,50 @@ export async function preencherTabelaValores() {
     }
 
     try {
-        const rate = await fetchExchangeRate();
-        if (!rate) {
-            throw new Error("Taxa de câmbio indisponível");
+        const exchangeData = await fetchExchangeRate();
+        
+        if (!exchangeData || typeof exchangeData.rate !== 'number') {
+            throw new Error("Taxa de câmbio inválida");
         }
 
+        const rate = exchangeData.rate;
         const valores = [1, 2, 5, 10, 25, 50, 100, 1000];
+        
+        // Limpar tabela existente
         tabelaValores.innerHTML = '';
         
+        // Preencher com novos valores
         valores.forEach(valor => {
             const row = tabelaValores.insertRow();
             const brlValue = valor * rate;
             
             // Célula do dólar
             const usdCell = row.insertCell();
-            usdCell.textContent = `US$ ${valor} (${numeroParaExtenso(valor)} ${valor === 1 ? 'dólar' : 'dólares'})`;
+            const extenso = numeroParaExtenso(valor);
+            usdCell.textContent = `US$ ${valor} (${extenso} ${valor === 1 ? 'dólar' : 'dólares'})`;
             
             // Célula do real
             const brlCell = row.insertCell();
-            brlCell.textContent = `R$ ${brlValue.toFixed(2).replace('.', ',')}`;
+            brlCell.textContent = `R$ ${formatarMoeda(brlValue)}`;
+
+            // Adicionar classes para estilização
+            usdCell.className = 'usd-value';
+            brlCell.className = 'brl-value';
         });
 
     } catch (error) {
         console.error("Erro ao preencher tabela:", error);
         showError("Erro ao carregar dados da tabela. Tente novamente mais tarde.");
-        tabelaValores.innerHTML = '<tr><td colspan="2">Erro ao carregar dados da tabela.</td></tr>';
+        
+        tabelaValores.innerHTML = `
+            <tr>
+                <td colspan="2" class="error-message">
+                    Erro ao carregar dados da tabela.
+                    <button onclick="window.location.reload()" class="retry-button">
+                        Tentar novamente
+                    </button>
+                </td>
+            </tr>
+        `;
     }
 }

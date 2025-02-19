@@ -5,111 +5,168 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#f0f0f5">
     <meta name="description" content="Veja a cotação atualizada do dólar, converta valores de forma interativa, visualize gráficos e acompanhe o histórico de variações.">
+    
+    <!-- Tags Open Graph para compartilhamento -->
+    <meta property="og:title" content="Dólar Agora - Conversão e Cotação Atualizada">
+    <meta property="og:description" content="Acompanhe a cotação do dólar em tempo real e faça conversões monetárias.">
+    <meta property="og:type" content="website">
+    
+    <!-- Favicon -->
+    <link rel="icon" href="img/favicon.ico" type="image/x-icon">
+    <link rel="apple-touch-icon" href="img/apple-touch-icon.png">
+    
     <title>Dólar Agora - Conversão e Cotação Atualizada</title>
+    
+    <!-- Preload de recursos críticos -->
+    <link rel="preload" href="css/style.css" as="style">
+    <link rel="preload" href="js/modules/index.js" as="script" type="module">
+    <link rel="preload" href="img/dolar-logo.webp" as="image">
+    
+    <!-- CSS -->
     <link rel="stylesheet" href="css/style.css">
-    <!-- Dependências do Chart.js na ordem correta e com versões específicas -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/date-fns@2.29.3/dist/date-fns.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/date-fns@2.29.3/locale/pt-BR/index.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@2.0.1/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    
+    <!-- Dependências externas -->
+    <script defer src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/date-fns@2.29.3/dist/date-fns.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/date-fns@2.29.3/locale/pt-BR/index.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@2.0.1/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
 </head>
 <body data-theme="light">
+    <div id="error-container" class="message-container" role="alert" aria-live="polite"></div>
+    
     <header>
         <div class="container">
-            <img src="img/dolar-logo.webp" alt="Logo Dólar Agora" class="logo-header">
+            <img src="img/dolar-logo.webp" alt="Logo Dólar Agora" class="logo-header" width="50" height="50">
             <h1>Dólar Agora</h1>
             <p>Acompanhe a cotação do dólar em tempo real</p>
             <div id="local-time">
-                <p>Data e hora local: <span id="local-time-value"></span></p>
+                <p>Data e hora local: <span id="local-time-value" aria-live="polite"></span></p>
             </div>
-            <button id="toggle-theme" aria-label="Alternar modo noturno">🌙</button>
+            <button id="toggle-theme" aria-label="Alternar modo noturno" class="theme-toggle">
+                <span class="theme-icon">🌙</span>
+            </button>
         </div>
     </header>
 
     <main>
-        <section class="converter-section">
+        <section class="converter-section" aria-labelledby="converter-title">
+            <h2 id="converter-title" class="visually-hidden">Conversor de Moedas</h2>
             <div class="converter">
                 <div class="input-group">
-                    <span class="currency-prefix">US$</span>
-                    <input type="text" id="usd-input" placeholder="0,00">
+                    <label for="usd-input" class="currency-prefix">US$</label>
+                    <input type="text" 
+                           id="usd-input" 
+                           placeholder="0,00"
+                           aria-label="Valor em dólares"
+                           inputmode="decimal"
+                           pattern="[0-9]*[.,]?[0-9]*">
                 </div>
                 <div class="input-group">
-                    <span class="currency-prefix">R$</span>
-                    <input type="text" id="brl-input" placeholder="0,00">
+                    <label for="brl-input" class="currency-prefix">R$</label>
+                    <input type="text" 
+                           id="brl-input" 
+                           placeholder="0,00"
+                           aria-label="Valor em reais"
+                           inputmode="decimal"
+                           pattern="[0-9]*[.,]?[0-9]*">
                 </div>
             </div>
         </section>
 
-        <section class="chart-section">
-            <h2>Gráfico de Variação do Dólar</h2>
+        <section class="chart-section" aria-labelledby="chart-title">
+            <h2 id="chart-title">Gráfico de Variação do Dólar</h2>
             <div class="chart-container">
-                <canvas id="chart"></canvas>
+                <canvas id="chart" aria-label="Gráfico de variação do dólar" role="img"></canvas>
             </div>
-            <div class="chart-buttons">
-                <button data-period="7d" class="active">7 dias <span class="variation"></span></button>
-                <button data-period="1m">1 mês <span class="variation"></span></button>
-                <button data-period="6m">6 meses <span class="variation"></span></button>
-                <button data-period="1y">1 ano <span class="variation"></span></button>
+            <div class="chart-buttons" role="toolbar" aria-label="Períodos do gráfico">
+                <button data-period="7d" class="active" aria-pressed="true">
+                    7 dias <span class="variation" aria-label="variação"></span>
+                </button>
+                <button data-period="1m" aria-pressed="false">
+                    1 mês <span class="variation" aria-label="variação"></span>
+                </button>
+                <button data-period="6m" aria-pressed="false">
+                    6 meses <span class="variation" aria-label="variação"></span>
+                </button>
+                <button data-period="1y" aria-pressed="false">
+                    1 ano <span class="variation" aria-label="variação"></span>
+                </button>
             </div>
         </section>
 
-        <section class="dolar-info-section">
-            <h2>Valor do Dólar Hoje</h2>
+        <section class="dolar-info-section" aria-labelledby="dolar-today-title">
+            <h2 id="dolar-today-title">Valor do Dólar Hoje</h2>
             <div class="dolar-valor-hoje">
-                <span class="valor">R$ <span id="current-dollar-value">5,68</span></span>
-                <span class="variacao negative">(-0,53% em relação a ontem)</span>
+                <span class="valor">
+                    R$ <span id="current-dollar-value" aria-live="polite">5,68</span>
+                </span>
+                <span class="variacao negative" aria-live="polite">
+                    (-0,53% em relação a ontem)
+                </span>
             </div>
-            <p class="dolar-info-text">
-                Cotação do dólar comercial americano atualizada continuamente para mantê-lo informado sobre as variações do mercado cambial, auxiliando em suas decisões financeiras.
-            </p>
-            <p class="dolar-info-text">
-                O valor do dólar apresentado é de caráter informativo.
-            </p>
-        
-            <h3>Sobre o dólar</h3>
-            <p class="dolar-info-text">
-                O dólar americano (USD, US$) é a moeda oficial dos Estados Unidos, emitida pelo Federal Reserve (Banco Central americano). Além dos EUA, é a moeda oficial de diversos territórios como Timor-Leste, Equador, El Salvador, Panamá e Porto Rico, sendo também utilizada informalmente em várias outras regiões.
-            </p>
-        
-            <h3>Diferença entre dólar comercial e turismo</h3>
-            <p class="dolar-info-text">
-                O dólar comercial é utilizado em transações entre instituições financeiras e grandes empresas, apresentando cotações distintas para compra e venda. Já o dólar turismo é destinado a pessoas físicas, principalmente para viagens internacionais e compras no exterior.
-            </p>
-        
-            <h3>Fatores que influenciam a cotação</h3>
-            <p class="dolar-info-text">
-                A cotação do dólar é influenciada por diversos fatores, incluindo a economia global, especialmente de países como Estados Unidos e China, políticas monetárias, reservas internacionais mantidas pelo Banco Central, cenário político-econômico e balança comercial.
-            </p>
-        
-            <h3>Impacto nas viagens e compras internacionais</h3>
-            <p class="dolar-info-text">
-                As variações cambiais afetam diretamente o custo de viagens internacionais e produtos importados. Para viajantes e consumidores de produtos estrangeiros, é fundamental acompanhar a cotação regularmente para planejar melhor seus gastos e identificar momentos mais favoráveis para suas compras.
-            </p>
+            
+            <div class="info-container">
+                <p class="dolar-info-text">
+                    Cotação do dólar comercial americano atualizada continuamente para mantê-lo informado sobre as variações do mercado cambial, auxiliando em suas decisões financeiras.
+                </p>
+                <p class="dolar-info-text disclaimer">
+                    O valor do dólar apresentado é de caráter informativo.
+                </p>
+
+                <details open>
+                    <summary><h3>Sobre o dólar</h3></summary>
+                    <p class="dolar-info-text">
+                        O dólar americano (USD, US$) é a moeda oficial dos Estados Unidos, emitida pelo Federal Reserve (Banco Central americano). Além dos EUA, é a moeda oficial de diversos territórios como Timor-Leste, Equador, El Salvador, Panamá e Porto Rico, sendo também utilizada informalmente em várias outras regiões.
+                    </p>
+                </details>
+
+                <details>
+                    <summary><h3>Diferença entre dólar comercial e turismo</h3></summary>
+                    <p class="dolar-info-text">
+                        O dólar comercial é utilizado em transações entre instituições financeiras e grandes empresas, apresentando cotações distintas para compra e venda. Já o dólar turismo é destinado a pessoas físicas, principalmente para viagens internacionais e compras no exterior.
+                    </p>
+                </details>
+
+                <details>
+                    <summary><h3>Fatores que influenciam a cotação</h3></summary>
+                    <p class="dolar-info-text">
+                        A cotação do dólar é influenciada por diversos fatores, incluindo a economia global, especialmente de países como Estados Unidos e China, políticas monetárias, reservas internacionais mantidas pelo Banco Central, cenário político-econômico e balança comercial.
+                    </p>
+                </details>
+
+                <details>
+                    <summary><h3>Impacto nas viagens e compras internacionais</h3></summary>
+                    <p class="dolar-info-text">
+                        As variações cambiais afetam diretamente o custo de viagens internacionais e produtos importados. Para viajantes e consumidores de produtos estrangeiros, é fundamental acompanhar a cotação regularmente para planejar melhor seus gastos e identificar momentos mais favoráveis para suas compras.
+                    </p>
+                </details>
+            </div>
         </section>
 
-        <section class="tabela-valores">
-            <h2>Tabela de Valores em Dólar Convertidos em Real</h2>
-            <table id="valores-dolar">
-                <thead>
-                    <tr>
-                        <th>Dólar</th>
-                        <th>Real</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <!-- Será preenchido via JavaScript -->
-                </tbody>
-            </table>
+        <section class="tabela-valores" aria-labelledby="table-title">
+            <h2 id="table-title">Tabela de Valores em Dólar Convertidos em Real</h2>
+            <div class="table-wrapper">
+                <table id="valores-dolar">
+                    <caption class="visually-hidden">Valores de conversão dólar para real</caption>
+                    <thead>
+                        <tr>
+                            <th scope="col">Dólar</th>
+                            <th scope="col">Real</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Será preenchido via JavaScript -->
+                    </tbody>
+                </table>
+            </div>
         </section>
-
-        <div id="error-container" class="hidden"></div>
     </main>
 
     <footer>
         <p>&copy; 2025 Dólar Agora. Todos os direitos reservados.</p>
     </footer>
 
-    <!-- Carregar os módulos JavaScript por último -->
+    <!-- JavaScript -->
     <script type="module" src="js/modules/index.js"></script>
 </body>
 </html>
