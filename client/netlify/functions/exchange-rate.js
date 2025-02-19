@@ -1,10 +1,8 @@
-const fetch = require('node-fetch');
+// Usando ESM em vez de CommonJS
+import fetch from 'node-fetch';
 
-exports.handler = async function(event, context) {
-  // Log para debug
-  console.log('API_BASE_URL:', process.env.API_BASE_URL);
-  console.log('Exchange API Key configurada:', !!process.env.EXCHANGE_API_KEY);
-
+// Usando export default em vez de exports.handler
+export default async function handler(event, context) {
   try {
     const response = await fetch(
       `${process.env.API_BASE_URL}/latest.json?app_id=${process.env.EXCHANGE_API_KEY}&base=USD&symbols=BRL`,
@@ -15,17 +13,11 @@ exports.handler = async function(event, context) {
       }
     );
 
-    // Log para debug
-    console.log('Status da resposta:', response.status);
-    
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 
     const data = await response.json();
-    
-    // Log para debug
-    console.log('Dados recebidos:', JSON.stringify(data));
 
     return {
       statusCode: 200,
@@ -49,4 +41,4 @@ exports.handler = async function(event, context) {
       })
     };
   }
-};
+}
