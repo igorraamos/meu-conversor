@@ -1,6 +1,4 @@
-/**
- * Constantes para configuração
- */
+// Configurações
 const CONFIG = {
     ERROR_DISPLAY_TIME: 5000,
     DATE_FORMAT_OPTIONS: {
@@ -19,10 +17,27 @@ const CONFIG = {
 };
 
 /**
- * Formata um número para o formato brasileiro de moeda
+ * Formata um valor monetário
+ * @param {number} value - Valor a ser formatado
+ * @param {string} currency - Código da moeda (USD ou BRL)
+ * @returns {string} Valor formatado
+ */
+export function formatCurrency(value, currency = 'BRL') {
+    try {
+        return new Intl.NumberFormat('pt-BR', {
+            style: 'currency',
+            currency: currency
+        }).format(value);
+    } catch (error) {
+        console.warn('Erro ao formatar moeda:', error);
+        return currency === 'BRL' ? 'R$ 0,00' : 'US$ 0.00';
+    }
+}
+
+/**
+ * Formata um número
  * @param {number} value - Valor a ser formatado
  * @param {string} [currency=''] - Código da moeda (opcional)
- * @returns {string} Valor formatado
  */
 export function formatNumber(value, currency = '') {
     if (typeof value !== 'number' || isNaN(value)) return "0,00";
@@ -44,9 +59,8 @@ export function formatNumber(value, currency = '') {
 }
 
 /**
- * Converte uma string formatada em número
+ * Converte string formatada em número
  * @param {string} value - Valor formatado
- * @returns {number} Valor numérico
  */
 export function unformatNumber(value) {
     if (!value) return 0;
@@ -59,24 +73,21 @@ export function unformatNumber(value) {
 }
 
 /**
- * Exibe uma mensagem de erro com animação
+ * Exibe mensagem de erro
  * @param {string} message - Mensagem de erro
- * @param {string} [type='error'] - Tipo de mensagem ('error', 'warning', 'success')
+ * @param {string} [type='error'] - Tipo de mensagem
  */
 export function showError(message, type = 'error') {
     const errorContainer = document.getElementById("error-container");
     if (!errorContainer) return;
 
-    // Remove mensagem anterior se existir
     if (errorContainer.style.display === "block") {
         clearTimeout(errorContainer.timeoutId);
     }
 
-    // Define classe baseada no tipo
     errorContainer.className = `message-container ${type}`;
     errorContainer.textContent = message;
 
-    // Aplica animação
     errorContainer.style.opacity = "0";
     errorContainer.style.display = "block";
     
@@ -85,13 +96,35 @@ export function showError(message, type = 'error') {
         errorContainer.style.opacity = "1";
     });
 
-    // Configura timeout para remover
     errorContainer.timeoutId = setTimeout(() => {
         errorContainer.style.opacity = "0";
         setTimeout(() => {
             errorContainer.style.display = "none";
         }, CONFIG.ANIMATION_DURATION);
     }, CONFIG.ERROR_DISPLAY_TIME);
+}
+
+/**
+ * Formata data
+ * @param {Date|string} date - Data a ser formatada
+ * @param {boolean} [includeTime=true] - Incluir horário
+ */
+export function formatDate(date, includeTime = true) {
+    try {
+        const dateObj = typeof date === 'string' ? new Date(date) : date;
+        const options = {
+            ...CONFIG.DATE_FORMAT_OPTIONS,
+            ...(includeTime ? {} : {
+                hour: undefined,
+                minute: undefined,
+                second: undefined
+            })
+        };
+        return dateObj.toLocaleString('pt-BR', options);
+    } catch (error) {
+        console.warn('Erro ao formatar data:', error);
+        return '';
+    }
 }
 
 /**
@@ -103,26 +136,40 @@ export function updateLocalTime() {
 
     try {
         const now = new Date();
-        localTimeElement.textContent = now.toLocaleString("pt-BR", CONFIG.DATE_FORMAT_OPTIONS);
+        localTimeElement.textContent = formatDate(now);
     } catch (error) {
         console.warn('Erro ao atualizar horário:', error);
     }
 }
 
 /**
- * Inicializa o relógio local
- * @returns {number} ID do intervalo para possível limpeza
+ * Calcula variação percentual
+ * @param {number} current - Valor atual
+ * @param {number} previous - Valor anterior
  */
-export function initializeLocalTime() {
-    updateLocalTime();
-    return setInterval(updateLocalTime, 1000);
+export function calculateVariation(current, previous) {
+    if (!previous || !current) return '0,00%';
+    
+    const variation = ((current - previous) / previous) * 100;
+    const sign = variation > 0 ? '+' : '';
+    return `${sign}${formatNumber(variation)}%`;
 }
 
 /**
- * Cria uma versão debounced de uma função
+ * Valida valor monetário
+ * @param {string|number} value - Valor a ser validado
+ */
+export function isValidMoneyValue(value) {
+    if (typeof value === 'number') {
+        return !isNaN(value) && isFinite(value) && value >= 0;
+    }
+    return /^[\d.,]*$/.test(value);
+}
+
+/**
+ * Cria função com debounce
  * @param {Function} func - Função a ser debounced
- * @param {number} wait - Tempo de espera em millisegundos
- * @returns {Function} Função debounced
+ * @param {number} wait - Tempo de espera em ms
  */
 export function debounce(func, wait) {
     let timeout;
@@ -137,54 +184,27 @@ export function debounce(func, wait) {
 }
 
 /**
- * Formata uma data para o formato brasileiro
- * @param {Date|string} date - Data a ser formatada
- * @param {boolean} [includeTime=false] - Incluir horário
- * @returns {string} Data formatada
+ * Inicializa relógio local
  */
-export function formatDate(date, includeTime = false) {
-    try {
-        const dateObj = typeof date === 'string' ? new Date(date) : date;
-        return dateObj.toLocaleString('pt-BR', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric',
-            ...(includeTime && {
-                hour: '2-digit',
-                minute: '2-digit'
-            })
-        });
-    } catch (error) {
-        console.warn('Erro ao formatar data:', error);
-        return '';
-    }
+export function initializeLocalTime() {
+    updateLocalTime();
+    return setInterval(updateLocalTime, 1000);
 }
 
-/**
- * Calcula a diferença percentual entre dois valores
- * @param {number} current - Valor atual
- * @param {number} previous - Valor anterior
- * @returns {string} Variação formatada com sinal
- */
-export function calculateVariation(current, previous) {
-    if (!previous || !current) return '0,00%';
-    
-    const variation = ((current - previous) / previous) * 100;
-    const sign = variation > 0 ? '+' : '';
-    return `${sign}${formatNumber(variation)}%`;
-}
-
-/**
- * Valida um valor monetário
- * @param {string|number} value - Valor a ser validado
- * @returns {boolean} Verdadeiro se válido
- */
-export function isValidMoneyValue(value) {
-    if (typeof value === 'number') {
-        return !isNaN(value) && isFinite(value) && value >= 0;
-    }
-    return /^[\d.,]*$/.test(value);
-}
-
-// Exporta configurações para uso em outros módulos
+// Exporta configurações
 export const utilsConfig = { ...CONFIG };
+
+// Exporta todas as funções em um objeto
+export default {
+    formatCurrency,
+    formatNumber,
+    unformatNumber,
+    showError,
+    formatDate,
+    updateLocalTime,
+    calculateVariation,
+    isValidMoneyValue,
+    debounce,
+    initializeLocalTime,
+    utilsConfig
+};

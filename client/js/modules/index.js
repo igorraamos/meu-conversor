@@ -1,326 +1,263 @@
-import { fetchExchangeRate } from './api.js';
-import { renderChart } from './chart.js';
-import { preencherTabelaValores } from './table.js';
-import { initTheme } from './theme.js';
-import { 
-    formatNumber, 
-    unformatNumber, 
-    showError, 
-    updateLocalTime,
-    debounce 
-} from './utils.js';
+// Importações
+import { fetchExchangeRate, getHistoricalRates } from './api.js';
+import { formatCurrency, formatDate, showError } from './utils.js';
 
-// Constantes
-const UPDATE_INTERVAL = 30 * 1000; // 30 segundos
-const INITIAL_USD_VALUE = "1,00";
-const DEFAULT_CHART_PERIOD = '7d';
-const MAX_RETRIES = 3;
-const RETRY_DELAY = 2000;
-const BATCH_DELAY = 1000; // Delay entre lotes de requisições
-
-// Cache de elementos DOM
+// Cache do DOM
 const elements = {
-    usdInput: document.getElementById("usd-input"),
-    brlInput: document.getElementById("brl-input"),
-    currentDollarValue: document.getElementById("current-dollar-value"),
-    dollarVariation: document.querySelector(".dolar-valor-hoje .variacao"),
+    usdInput: document.getElementById('usd-input'),
+    brlInput: document.getElementById('brl-input'),
+    currentDollarValue: document.getElementById('current-dollar-value'),
     chartButtons: document.querySelectorAll('.chart-buttons button'),
-    lastUpdate: document.getElementById("last-update")
+    localTimeValue: document.getElementById('local-time-value'),
+    themeToggle: document.getElementById('toggle-theme'),
+    chart: document.getElementById('chart')
 };
 
 // Estado da aplicação
 const state = {
-    lastRate: null,
-    previousRate: null,
-    isInitialized: false,
+    currentRate: 0,
+    chart: null,
     updateInterval: null,
-    retryCount: 0,
-    lastUpdateTime: null,
-    isUpdating: false
+    lastUpdate: null
 };
 
-/**
- * Calcula a variação percentual entre duas taxas
- */
-function calculateVariation(currentRate, previousRate) {
-    if (!previousRate || !currentRate) return 0;
-    return ((currentRate - previousRate) / previousRate) * 100;
+// Funções de atualização da UI
+function updateLocalTime() {
+    const now = new Date();
+    elements.localTimeValue.textContent = formatDate(now);
 }
 
-/**
- * Atualiza as informações do dólar na interface
- */
-function updateDollarInfo(rate, variation) {
-    if (!elements.currentDollarValue || !elements.dollarVariation) return;
+function updateDollarValue(rate, previousRate) {
+    elements.currentDollarValue.textContent = formatCurrency(rate, 'BRL').replace('R$ ', '');
+    
+    const variationElement = document.querySelector('.variacao');
+    if (variationElement && previousRate) {
+        const variation = ((rate - previousRate) / previousRate) * 100;
+        variationElement.textContent = `(${variation >= 0 ? '+' : ''}${variation.toFixed(2)}% em relação a ontem)`;
+        variationElement.className = `variacao ${variation >= 0 ? 'positive' : 'negative'}`;
+    }
+}
 
+// Funções do gráfico
+function initChart() {
+    if (!elements.chart) return;
+    
+    const ctx = elements.chart.getContext('2d');
+    state.chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            datasets: [{
+                label: 'Cotação do Dólar',
+                borderColor: '#2ecc71',
+                backgroundColor: 'rgba(46, 204, 113, 0.1)',
+                borderWidth: 2,
+                pointRadius: 3,
+                pointBackgroundColor: '#2ecc71',
+                tension: 0.4,
+                data: []
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    mode: 'index',
+                    intersect: false,
+                    callbacks: {
+                        label: (context) => `R$ ${context.parsed.y.toFixed(2)}`
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    type: 'time',
+                    time: {
+                        unit: 'day',
+                        displayFormats: { day: 'dd/MM' }
+                    },
+                    grid: { display: false }
+                },
+                y: {
+                    beginAtZero: false,
+                    grid: { color: 'rgba(0, 0, 0, 0.1)' }
+                }
+            }
+        }
+    });
+}
+
+async function updateChart(period) {
     try {
-        // Verificar se rate é um número válido
-        if (typeof rate !== 'number' || isNaN(rate)) {
-            console.error('Taxa inválida:', rate);
-            return;
+        const data = await getHistoricalRates(period);
+        if (!data || data.length === 0) {
+            throw new Error('Dados históricos não disponíveis');
         }
 
-        // Atualizar valor atual do dólar
-        elements.currentDollarValue.textContent = rate.toFixed(2).replace('.', ',');
+        const chartData = data.map(item => ({
+            x: new Date(item.date),
+            y: item.rate
+        }));
+
+        if (state.chart) {
+            state.chart.data.datasets[0].data = chartData;
+            state.chart.update();
+        }
+
+        updateVariations(data);
+    } catch (error) {
+        console.error('Erro ao atualizar gráfico:', error);
+        showError('Erro ao carregar dados históricos');
+    }
+}
+
+function updateVariations(data) {
+    if (!data || data.length < 2) return;
+
+    elements.chartButtons.forEach(button => {
+        const period = button.dataset.period;
+        const periodData = filterDataByPeriod(data, period);
         
-        // Atualizar variação
-        if (typeof variation === 'number' && !isNaN(variation)) {
-            const isPositive = variation >= 0;
-            const absVariation = Math.abs(variation).toFixed(2).replace('.', ',');
+        if (periodData.length >= 2) {
+            const firstRate = periodData[0].rate;
+            const lastRate = periodData[periodData.length - 1].rate;
+            const variation = ((lastRate - firstRate) / firstRate) * 100;
             
-            elements.dollarVariation.className = `variacao ${isPositive ? 'positive' : 'negative'}`;
-            elements.dollarVariation.innerHTML = `
-                <span class="arrow">${isPositive ? '▲' : '▼'}</span>
-                ${isPositive ? '+' : '-'}${absVariation}%
-                <span class="variation-info">em relação a ontem</span>
-            `;
-        }
-
-        // Atualizar horário
-        if (elements.lastUpdate) {
-            const now = new Date();
-            state.lastUpdateTime = now;
-            elements.lastUpdate.textContent = now.toLocaleTimeString('pt-BR', {
-                hour: '2-digit',
-                minute: '2-digit'
-            });
-        }
-    } catch (error) {
-        console.error('Erro ao atualizar informações:', error);
-    }
-}
-
-/**
- * Tenta executar uma operação com retry
- */
-async function withRetry(operation, maxRetries = MAX_RETRIES) {
-    let lastError;
-    
-    for (let i = 0; i < maxRetries; i++) {
-        try {
-            return await operation();
-        } catch (error) {
-            lastError = error;
-            if (i < maxRetries - 1) {
-                await new Promise(resolve => setTimeout(resolve, RETRY_DELAY * Math.pow(2, i)));
+            const variationSpan = button.querySelector('.variation');
+            if (variationSpan) {
+                variationSpan.textContent = `${variation >= 0 ? '+' : ''}${variation.toFixed(2)}%`;
+                variationSpan.className = `variation ${variation >= 0 ? 'positive' : 'negative'}`;
             }
         }
-    }
-    
-    throw lastError;
-}
-
-/**
- * Atualiza os valores de conversão
- */
-async function updateConversion(fromUSD = true) {
-    if (state.isUpdating) return;
-    state.isUpdating = true;
-
-    try {
-        const data = await withRetry(() => fetchExchangeRate());
-        
-        if (!data || typeof data.rate !== 'number') {
-            throw new Error('Taxa de câmbio inválida');
-        }
-
-        const rate = data.rate;
-        const previousRate = data.previousRate || state.lastRate;
-
-        // Atualizar histórico de taxas
-        if (state.lastRate !== rate) {
-            state.previousRate = state.lastRate;
-            state.lastRate = rate;
-        }
-
-        // Calcular e atualizar variação
-        const variation = calculateVariation(rate, previousRate);
-        updateDollarInfo(rate, variation);
-
-        // Realizar conversão
-        if (fromUSD && elements.usdInput && elements.brlInput) {
-            const usdValue = unformatNumber(elements.usdInput.value || INITIAL_USD_VALUE);
-            const brlValue = usdValue * rate;
-            elements.brlInput.value = formatNumber(brlValue);
-        } else if (!fromUSD && elements.usdInput && elements.brlInput) {
-            const brlValue = unformatNumber(elements.brlInput.value);
-            const usdValue = brlValue / rate;
-            elements.usdInput.value = formatNumber(usdValue);
-        }
-
-        state.retryCount = 0;
-        return rate;
-    } catch (error) {
-        console.error("Erro ao converter valor:", error);
-        showError("Erro ao converter valor. Tentando novamente...");
-        
-        if (++state.retryCount >= MAX_RETRIES) {
-            showError("Não foi possível atualizar os valores. Tente novamente mais tarde.");
-            state.retryCount = 0;
-        }
-        return null;
-    } finally {
-        state.isUpdating = false;
-    }
-}
-
-/**
- * Configura os eventos de input para os campos de valor
- */
-function setupInputHandler(input, isUSD) {
-    if (!input) return;
-
-    const debouncedUpdate = debounce(() => updateConversion(isUSD), 300);
-
-    input.addEventListener("input", (event) => {
-        const value = event.target.value;
-        if (!/^[\d.,]*$/.test(value)) {
-            event.target.value = value.replace(/[^\d.,]/g, '');
-            return;
-        }
-        debouncedUpdate();
-    });
-
-    input.addEventListener("focus", () => input.select());
-    
-    input.addEventListener("blur", () => {
-        const currentValue = unformatNumber(input.value);
-        input.value = formatNumber(currentValue);
     });
 }
 
-/**
- * Inicializa o conversor de moedas
- */
-function initializeConversor() {
-    setupInputHandler(elements.usdInput, true);
-    setupInputHandler(elements.brlInput, false);
+function filterDataByPeriod(data, period) {
+    const now = new Date();
+    let startDate = new Date();
+    
+    switch(period) {
+        case '7d': startDate.setDate(now.getDate() - 7); break;
+        case '1m': startDate.setMonth(now.getMonth() - 1); break;
+        case '6m': startDate.setMonth(now.getMonth() - 6); break;
+        case '1y': startDate.setFullYear(now.getFullYear() - 1); break;
+    }
+    
+    return data.filter(item => new Date(item.date) >= startDate);
 }
 
-/**
- * Inicializa os botões do gráfico
- */
-function initializeChartButtons() {
+// Funções de conversão
+function convertValues(value, fromUSD = true) {
+    if (!value) return '';
+    
+    const numericValue = parseFloat(value.replace(/[^0-9.,]/g, '').replace(',', '.'));
+    if (isNaN(numericValue)) return '';
+    
+    return fromUSD ? 
+        formatCurrency(numericValue * state.currentRate, 'BRL') :
+        formatCurrency(numericValue / state.currentRate, 'USD');
+}
+
+// Event Listeners
+function setupEventListeners() {
+    // Input de conversão
+    elements.usdInput?.addEventListener('input', (e) => {
+        elements.brlInput.value = convertValues(e.target.value, true);
+    });
+
+    elements.brlInput?.addEventListener('input', (e) => {
+        elements.usdInput.value = convertValues(e.target.value, false);
+    });
+
+    // Botões do gráfico
     elements.chartButtons?.forEach(button => {
-        button.addEventListener('click', async () => {
-            if (state.isUpdating) return;
-
-            const period = button.dataset.period;
-            elements.chartButtons.forEach(btn => {
-                btn.classList.remove('active');
-                btn.setAttribute('aria-pressed', 'false');
-            });
+        button.addEventListener('click', () => {
+            elements.chartButtons.forEach(btn => btn.classList.remove('active'));
             button.classList.add('active');
-            button.setAttribute('aria-pressed', 'true');
-
-            try {
-                await renderChart(period);
-            } catch (error) {
-                console.error('Erro ao atualizar gráfico:', error);
-                showError('Erro ao atualizar gráfico. Tente novamente.');
-            }
+            updateChart(button.dataset.period);
         });
     });
+
+    // Toggle de tema
+    elements.themeToggle?.addEventListener('click', () => {
+        const body = document.body;
+        const currentTheme = body.dataset.theme;
+        const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+        body.dataset.theme = newTheme;
+        localStorage.setItem('theme', newTheme);
+    });
 }
 
-/**
- * Atualiza os dados periodicamente
- */
-async function startPeriodicUpdates() {
+// Função de atualização automática
+async function setupAutoUpdate() {
+    // Limpa intervalo anterior se existir
     if (state.updateInterval) {
         clearInterval(state.updateInterval);
     }
 
-    async function updateAll() {
-        if (state.isUpdating) return;
-        state.isUpdating = true;
-
+    // Configura novo intervalo
+    state.updateInterval = setInterval(async () => {
         try {
-            await updateConversion(true);
-            await new Promise(resolve => setTimeout(resolve, BATCH_DELAY));
-            
-            await preencherTabelaValores();
-            await new Promise(resolve => setTimeout(resolve, BATCH_DELAY));
-            
-            const activeButton = document.querySelector('.chart-buttons button.active');
-            if (activeButton) {
-                await renderChart(activeButton.dataset.period);
+            const data = await fetchExchangeRate();
+            if (data.rate !== state.currentRate) {
+                state.currentRate = data.rate;
+                updateDollarValue(data.rate, data.previousRate);
+
+                // Atualiza conversões se necessário
+                if (elements.usdInput.value) {
+                    elements.brlInput.value = convertValues(elements.usdInput.value, true);
+                } else if (elements.brlInput.value) {
+                    elements.usdInput.value = convertValues(elements.brlInput.value, false);
+                }
             }
         } catch (error) {
             console.error('Erro na atualização automática:', error);
-        } finally {
-            state.isUpdating = false;
         }
-    }
-
-    await updateAll();
-    state.updateInterval = setInterval(updateAll, UPDATE_INTERVAL);
+    }, 30000); // Atualiza a cada 30 segundos
 }
 
-/**
- * Inicializa a aplicação
- */
-async function initialize() {
-    if (state.isInitialized) return;
-
+// Inicialização
+async function init() {
     try {
-        console.log('Inicializando aplicação...');
-        
-        initTheme();
-        initializeConversor();
-        initializeChartButtons();
-        
-        if (elements.usdInput) {
-            elements.usdInput.value = INITIAL_USD_VALUE;
-        }
+        // Inicializa o tema
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        document.body.dataset.theme = savedTheme;
 
-        await updateConversion(true);
-        await new Promise(resolve => setTimeout(resolve, BATCH_DELAY));
+        // Inicializa componentes
+        initChart();
+        setupEventListeners();
         
-        await renderChart(DEFAULT_CHART_PERIOD);
-        await new Promise(resolve => setTimeout(resolve, BATCH_DELAY));
-        
-        await preencherTabelaValores();
-        
+        // Primeira atualização
         updateLocalTime();
         setInterval(updateLocalTime, 1000);
-        await startPeriodicUpdates();
-        
-        state.isInitialized = true;
-        console.log('Aplicação inicializada com sucesso');
-    } catch (error) {
-        console.error('Erro durante a inicialização:', error);
-        showError('Erro ao inicializar a aplicação. Tente recarregar a página.');
-        state.isInitialized = false;
-    }
-}
 
-// Inicialização e event listeners
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initialize);
-} else {
-    initialize();
-}
+        // Busca dados iniciais
+        const data = await fetchExchangeRate();
+        state.currentRate = data.rate;
+        updateDollarValue(data.rate, data.previousRate);
 
-// Gerenciamento de visibilidade e limpeza
-window.addEventListener('beforeunload', () => {
-    if (state.updateInterval) {
-        clearInterval(state.updateInterval);
-    }
-});
-
-document.addEventListener('visibilitychange', () => {
-    if (document.hidden) {
-        if (state.updateInterval) {
-            clearInterval(state.updateInterval);
+        // Atualiza gráfico inicial
+        const activeButton = document.querySelector('.chart-buttons button.active');
+        if (activeButton) {
+            await updateChart(activeButton.dataset.period);
         }
-    } else {
-        startPeriodicUpdates();
-    }
-});
 
+        // Configura atualização automática
+        await setupAutoUpdate();
+
+    } catch (error) {
+        console.error('Erro na inicialização:', error);
+        showError('Erro ao carregar dados iniciais');
+    }
+}
+
+// Inicia a aplicação quando o DOM estiver pronto
+document.addEventListener('DOMContentLoaded', init);
+
+// Exporta funções necessárias
 export {
-    updateConversion,
-    renderChart,
-    preencherTabelaValores
+    updateChart,
+    convertValues,
+    updateLocalTime
 };
