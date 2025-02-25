@@ -1,4 +1,4 @@
-// Importações
+// Importações usando ES modules
 import { fetchExchangeRate, getHistoricalRates } from './api.js';
 import { formatCurrency, formatDate, showError } from './utils.js';
 
@@ -10,31 +10,46 @@ const elements = {
     chartButtons: document.querySelectorAll('.chart-buttons button'),
     localTimeValue: document.getElementById('local-time-value'),
     themeToggle: document.getElementById('toggle-theme'),
-    chart: document.getElementById('chart')
+    chart: document.getElementById('chart'),
+    variationElement: document.querySelector('.variacao')
 };
 
 // Estado da aplicação
 const state = {
     currentRate: 0,
     chart: null,
-    updateInterval: null,
-    lastUpdate: null
+    updateInterval: null
 };
 
-// Funções de atualização da UI
+// Função para debounce de inputs
+const debounce = (func, wait) => {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+};
+
+// Funções de UI
 function updateLocalTime() {
+    if (!elements.localTimeValue) return;
     const now = new Date();
     elements.localTimeValue.textContent = formatDate(now);
 }
 
 function updateDollarValue(rate, previousRate) {
+    if (!elements.currentDollarValue || !elements.variationElement) return;
+    
     elements.currentDollarValue.textContent = formatCurrency(rate, 'BRL').replace('R$ ', '');
     
-    const variationElement = document.querySelector('.variacao');
-    if (variationElement && previousRate) {
+    if (previousRate) {
         const variation = ((rate - previousRate) / previousRate) * 100;
-        variationElement.textContent = `(${variation >= 0 ? '+' : ''}${variation.toFixed(2)}% em relação a ontem)`;
-        variationElement.className = `variacao ${variation >= 0 ? 'positive' : 'negative'}`;
+        elements.variationElement.textContent = `(${variation >= 0 ? '+' : ''}${variation.toFixed(2)}% em relação a ontem)`;
+        elements.variationElement.className = `variacao ${variation >= 0 ? 'positive' : 'negative'}`;
     }
 }
 
@@ -91,9 +106,7 @@ function initChart() {
 async function updateChart(period) {
     try {
         const data = await getHistoricalRates(period);
-        if (!data || data.length === 0) {
-            throw new Error('Dados históricos não disponíveis');
-        }
+        if (!data?.length) throw new Error('Dados históricos não disponíveis');
 
         const chartData = data.map(item => ({
             x: new Date(item.date),
@@ -102,7 +115,7 @@ async function updateChart(period) {
 
         if (state.chart) {
             state.chart.data.datasets[0].data = chartData;
-            state.chart.update();
+            state.chart.update('show');
         }
 
         updateVariations(data);
@@ -113,9 +126,9 @@ async function updateChart(period) {
 }
 
 function updateVariations(data) {
-    if (!data || data.length < 2) return;
+    if (!data?.length || data.length < 2) return;
 
-    elements.chartButtons.forEach(button => {
+    elements.chartButtons?.forEach(button => {
         const period = button.dataset.period;
         const periodData = filterDataByPeriod(data, period);
         
@@ -159,18 +172,19 @@ function convertValues(value, fromUSD = true) {
         formatCurrency(numericValue / state.currentRate, 'USD');
 }
 
-// Event Listeners
+// Event Listeners com debounce
 function setupEventListeners() {
-    // Input de conversão
-    elements.usdInput?.addEventListener('input', (e) => {
+    const handleUSDInput = debounce((e) => {
         elements.brlInput.value = convertValues(e.target.value, true);
-    });
+    }, 300);
 
-    elements.brlInput?.addEventListener('input', (e) => {
+    const handleBRLInput = debounce((e) => {
         elements.usdInput.value = convertValues(e.target.value, false);
-    });
+    }, 300);
 
-    // Botões do gráfico
+    elements.usdInput?.addEventListener('input', handleUSDInput);
+    elements.brlInput?.addEventListener('input', handleBRLInput);
+
     elements.chartButtons?.forEach(button => {
         button.addEventListener('click', () => {
             elements.chartButtons.forEach(btn => btn.classList.remove('active'));
@@ -179,32 +193,23 @@ function setupEventListeners() {
         });
     });
 
-    // Toggle de tema
     elements.themeToggle?.addEventListener('click', () => {
         const body = document.body;
-        const currentTheme = body.dataset.theme;
-        const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+        const newTheme = body.dataset.theme === 'light' ? 'dark' : 'light';
         body.dataset.theme = newTheme;
         localStorage.setItem('theme', newTheme);
     });
 }
 
-// Função de atualização automática
+// Atualização automática com retry
 async function setupAutoUpdate() {
-    // Limpa intervalo anterior se existir
-    if (state.updateInterval) {
-        clearInterval(state.updateInterval);
-    }
-
-    // Configura novo intervalo
-    state.updateInterval = setInterval(async () => {
+    const updateRate = async (retryCount = 0) => {
         try {
             const data = await fetchExchangeRate();
             if (data.rate !== state.currentRate) {
                 state.currentRate = data.rate;
                 updateDollarValue(data.rate, data.previousRate);
 
-                // Atualiza conversões se necessário
                 if (elements.usdInput.value) {
                     elements.brlInput.value = convertValues(elements.usdInput.value, true);
                 } else if (elements.brlInput.value) {
@@ -212,38 +217,50 @@ async function setupAutoUpdate() {
                 }
             }
         } catch (error) {
-            console.error('Erro na atualização automática:', error);
+            console.error('Erro na atualização:', error);
+            if (retryCount < 3) {
+                setTimeout(() => updateRate(retryCount + 1), 5000);
+            }
         }
-    }, 30000); // Atualiza a cada 30 segundos
+    };
+
+    if (state.updateInterval) {
+        clearInterval(state.updateInterval);
+    }
+
+    // Primeira atualização
+    await updateRate();
+
+    // Atualizações subsequentes
+    state.updateInterval = setInterval(updateRate, 30000);
 }
 
 // Inicialização
 async function init() {
     try {
-        // Inicializa o tema
-        const savedTheme = localStorage.getItem('theme') || 'light';
-        document.body.dataset.theme = savedTheme;
+        // Tema
+        document.body.dataset.theme = localStorage.getItem('theme') || 'light';
 
-        // Inicializa componentes
+        // Componentes
         initChart();
         setupEventListeners();
         
-        // Primeira atualização
+        // Hora local
         updateLocalTime();
         setInterval(updateLocalTime, 1000);
 
-        // Busca dados iniciais
+        // Dados iniciais
         const data = await fetchExchangeRate();
         state.currentRate = data.rate;
         updateDollarValue(data.rate, data.previousRate);
 
-        // Atualiza gráfico inicial
+        // Gráfico inicial
         const activeButton = document.querySelector('.chart-buttons button.active');
         if (activeButton) {
             await updateChart(activeButton.dataset.period);
         }
 
-        // Configura atualização automática
+        // Atualizações automáticas
         await setupAutoUpdate();
 
     } catch (error) {
@@ -252,11 +269,11 @@ async function init() {
     }
 }
 
-// Inicia a aplicação quando o DOM estiver pronto
+// Inicialização quando o DOM estiver pronto
 document.addEventListener('DOMContentLoaded', init);
 
-// Exporta funções necessárias
-export {
+// Exportações
+export const converter = {
     updateChart,
     convertValues,
     updateLocalTime

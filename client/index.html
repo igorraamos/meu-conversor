@@ -19,16 +19,18 @@
     
     <!-- Preload de recursos críticos -->
     <link rel="preload" href="css/style.css" as="style">
-    <link rel="preload" href="js/modules/index.js" as="script" type="module">
+    <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/axios@1.6.7/dist/axios.min.js" crossorigin>
+    <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js" crossorigin>
     <link rel="preload" href="img/dolar-logo.webp" as="image">
     
     <!-- CSS -->
     <link rel="stylesheet" href="css/style.css">
     
-    <!-- Dependências externas -->
-    <!-- Dependências externas - carregadas antes dos módulos -->
-    <script defer src="https://cdn.jsdelivr.net/npm/axios@1.6.7/dist/axios.min.js"></script>
-    <script defer src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <!-- Dependências externas - Carregadas primeiro e de forma síncrona para garantir disponibilidade -->
+    <script src="https://cdn.jsdelivr.net/npm/axios@1.6.7/dist/axios.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    
+    <!-- Dependências secundárias - Podem ser carregadas de forma assíncrona -->
     <script defer src="https://cdn.jsdelivr.net/npm/date-fns@2.29.3/dist/date-fns.min.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/date-fns@2.29.3/locale/pt-BR/index.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@2.0.1/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
