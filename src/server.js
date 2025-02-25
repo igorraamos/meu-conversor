@@ -13,6 +13,21 @@ const __dirname = path.dirname(__filename);
 const clientPath = path.join(__dirname, '../client');
 const isProduction = process.env.NODE_ENV === 'production';
 
+// Rate limiting mais permissivo para desenvolvimento
+const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutos
+    max: isProduction ? 100 : 1000, // limite por IP
+    message: { error: 'Muitas requisições, tente novamente mais tarde' },
+    standardHeaders: true,
+    legacyHeaders: false,
+    // Adiciona delay entre requisições
+    delayMs: 500
+});
+
+// Cache em memória com expiração
+const cache = new Map();
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutos
+
 // Configuração do Axios para OpenExchangeRates
 const api = axios.create({
     baseURL: 'https://openexchangerates.org/api',
@@ -22,13 +37,8 @@ const api = axios.create({
     }
 });
 
-// Cache em memória
-const cache = new Map();
-const CACHE_DURATION = 30000; // 30 segundos
-
 const app = express();
 
-// Middlewares
 app.use(cors());
 app.use(express.json());
 app.use(helmet({
@@ -36,25 +46,24 @@ app.use(helmet({
     crossOriginEmbedderPolicy: false
 }));
 
-// Rate limiting
-app.use('/api', rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: isProduction ? 100 : 1000,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: { error: 'Muitas requisições, tente novamente mais tarde' }
-}));
+// Middleware de cache
+const cacheMiddleware = (req, res, next) => {
+    const key = req.originalUrl;
+    const cachedResponse = cache.get(key);
+    
+    if (cachedResponse && Date.now() - cachedResponse.timestamp < CACHE_DURATION) {
+        return res.json(cachedResponse.data);
+    }
+    next();
+};
+
+// Aplica rate limiting e cache às rotas da API
+app.use('/api', limiter);
+app.use('/api', cacheMiddleware);
 
 // Rotas da API
 app.get('/api/exchange-rate', async (req, res) => {
     try {
-        const cacheKey = 'current_rate';
-        const cached = cache.get(cacheKey);
-        
-        if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-            return res.json(cached.data);
-        }
-
         const [current, previous] = await Promise.all([
             api.get('/latest.json', { params: { symbols: 'BRL' } }),
             api.get('/historical/' + getYesterdayDate() + '.json', { 
@@ -68,7 +77,7 @@ app.get('/api/exchange-rate', async (req, res) => {
             timestamp: current.data.timestamp
         };
 
-        cache.set(cacheKey, {
+        cache.set(req.originalUrl, {
             data,
             timestamp: Date.now()
         });
@@ -85,13 +94,6 @@ app.get('/api/exchange-rate', async (req, res) => {
 app.get('/api/historical/:date', async (req, res) => {
     try {
         const { date } = req.params;
-        const cacheKey = `historical_${date}`;
-        const cached = cache.get(cacheKey);
-
-        if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-            return res.json(cached.data);
-        }
-
         const response = await api.get(`/historical/${date}.json`, {
             params: { symbols: 'BRL' }
         });
@@ -102,7 +104,7 @@ app.get('/api/historical/:date', async (req, res) => {
             date
         };
 
-        cache.set(cacheKey, {
+        cache.set(req.originalUrl, {
             data,
             timestamp: Date.now()
         });
@@ -116,7 +118,7 @@ app.get('/api/historical/:date', async (req, res) => {
     }
 });
 
-// Função auxiliar para obter a data de ontem
+// Função auxiliar
 function getYesterdayDate() {
     const date = new Date();
     date.setDate(date.getDate() - 1);
@@ -131,10 +133,7 @@ app.get('*', (req, res) => {
     res.sendFile(path.join(clientPath, 'index.html'));
 });
 
-// Iniciar servidor
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
-    console.log(`Servidor rodando na porta ${PORT} em modo ${isProduction ? 'produção' : 'desenvolvimento'}`);
+    console.log(`Servidor rodando em http://localhost:${PORT} em modo ${isProduction ? 'produção' : 'desenvolvimento'}`);
 });
-
-export default app;
