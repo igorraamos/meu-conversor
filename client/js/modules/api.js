@@ -1,14 +1,10 @@
+import axios from 'axios';
 import { showError } from './utils.js';
 
 // Configurações
 const CONFIG = {
     isProduction: window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1',
     baseUrl: '/api',
-    headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-        'Cache-Control': 'no-cache'
-    },
     retryAttempts: 3,
     retryDelay: 1000,
     requestTimeout: 10000,
@@ -16,6 +12,17 @@ const CONFIG = {
     batchDelay: 1000,
     cacheDuration: 30 * 1000 // 30 segundos de cache
 };
+
+// Configuração do Axios
+const api = axios.create({
+    baseURL: CONFIG.baseUrl,
+    timeout: CONFIG.requestTimeout,
+    headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache'
+    }
+});
 
 // Sistema de cache
 class CacheSystem {
@@ -50,58 +57,22 @@ class CacheSystem {
 
 const cache = new CacheSystem();
 
-/**
- * Realiza uma requisição com retry e timeout
- */
-async function fetchWithRetry(url, options = {}) {
-    let lastError;
-    
-    for (let i = 0; i <= CONFIG.retryAttempts; i++) {
-        try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), CONFIG.requestTimeout);
-            
-            const response = await fetch(url, {
-                ...options,
-                signal: controller.signal,
-                headers: {
-                    ...CONFIG.headers,
-                    ...options.headers
-                }
-            });
-            
-            clearTimeout(timeoutId);
-            
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                if (response.status === 429) {
-                    const retryAfter = response.headers.get('Retry-After');
-                    await new Promise(resolve => 
-                        setTimeout(resolve, (retryAfter ? parseInt(retryAfter) * 1000 : CONFIG.retryDelay))
-                    );
-                    continue;
-                }
-                throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
-            }
-            
-            const data = await response.json();
-            return data;
-        } catch (error) {
-            lastError = error;
-            
-            if (error.name === 'AbortError') {
-                throw new Error('Requisição excedeu o tempo limite');
-            }
-            
-            if (i < CONFIG.retryAttempts) {
-                await new Promise(resolve => setTimeout(resolve, CONFIG.retryDelay * Math.pow(2, i)));
-                continue;
-            }
-        }
+// Interceptor para retry
+api.interceptors.response.use(null, async error => {
+    const config = error.config;
+    config.retryCount = config.retryCount || 0;
+
+    if (config.retryCount >= CONFIG.retryAttempts) {
+        return Promise.reject(error);
     }
-    
-    throw lastError;
-}
+
+    config.retryCount += 1;
+
+    const delay = CONFIG.retryDelay * Math.pow(2, config.retryCount - 1);
+    await new Promise(resolve => setTimeout(resolve, delay));
+
+    return api(config);
+});
 
 /**
  * Busca a taxa de câmbio atual
@@ -116,7 +87,7 @@ export async function fetchExchangeRate() {
             return cachedData;
         }
 
-        const data = await fetchWithRetry(`${CONFIG.baseUrl}/exchange-rate`);
+        const { data } = await api.get('/exchange-rate');
         
         if (!data || !data.rates || typeof data.rates.BRL !== 'number') {
             throw new Error('Formato de resposta inválido');
@@ -134,7 +105,6 @@ export async function fetchExchangeRate() {
         console.error('Erro ao buscar taxa de câmbio:', error);
         showError('Erro ao buscar cotação atual. Tentando novamente em 5 segundos...');
         
-        // Tentar novamente após 5 segundos com backoff exponencial
         const retryDelay = Math.min(5000 * Math.pow(2, cache.get('retryCount') || 0), 30000);
         await new Promise(resolve => setTimeout(resolve, retryDelay));
         cache.set('retryCount', (cache.get('retryCount') || 0) + 1);
@@ -161,7 +131,7 @@ async function fetchHistoricalBatch(dates) {
             }
 
             try {
-                const data = await fetchWithRetry(`${CONFIG.baseUrl}/historical/${date}`);
+                const { data } = await api.get(`/historical/${date}`);
 
                 if (!data || !data.rates || typeof data.rates.BRL !== 'number') {
                     console.warn(`Dados inválidos para ${date}`);
@@ -223,7 +193,6 @@ export async function getHistoricalRates(period) {
     try {
         const cachedData = cache.get(cacheKey);
         if (cachedData !== null && cachedData.length > 0) {
-            // Verificar se os dados ainda são válidos para o período atual
             const lastDate = new Date(cachedData[cachedData.length - 1].date);
             const now = new Date();
             if (lastDate.toDateString() === now.toDateString()) {

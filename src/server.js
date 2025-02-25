@@ -3,80 +3,134 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
-import fetch from 'node-fetch';
+import axios from 'axios';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-// Configuração do ambiente
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const isProduction = process.env.NODE_ENV === 'production';
-const API_BASE_URL = 'https://openexchangerates.org/api';
-
-// Ajuste do caminho para a pasta client
 const clientPath = path.join(__dirname, '../client');
 
-// Validações iniciais
-if (!process.env.OPENEXCHANGERATES_API_KEY) {
-    console.error('ERRO: OPENEXCHANGERATES_API_KEY não está configurada!');
-    process.exit(1);
-}
-
-const app = express();
-
-// Rate Limiters
-const generalLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: isProduction ? 100 : 1000,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: { error: 'Muitas requisições, tente novamente mais tarde' }
+// Configuração do Axios
+const api = axios.create({
+    baseURL: 'https://openexchangerates.org/api',
+    timeout: 10000,
+    params: {
+        app_id: process.env.OPENEXCHANGERATES_API_KEY
+    }
 });
-
-// Middlewares
-app.use(express.json());
-app.use(cors());
-
-// Configuração do Helmet mais permissiva para desenvolvimento
-const helmetConfig = {
-    contentSecurityPolicy: false,
-    crossOriginEmbedderPolicy: false,
-    crossOriginOpenerPolicy: false,
-    crossOriginResourcePolicy: { policy: "cross-origin" }
-};
-
-app.use(helmet(helmetConfig));
-
-// Rate Limiting
-app.use('/api/', generalLimiter);
 
 // Cache em memória
 const cache = new Map();
 const CACHE_DURATION = 30000; // 30 segundos
 
-// [... resto do código do servidor permanece igual até as rotas de arquivos estáticos ...]
+const app = express();
 
-// Servir arquivos estáticos da pasta client
+// Middlewares básicos
+app.use(cors());
+app.use(express.json());
+app.use(helmet({
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false
+}));
+
+// Rate limiting
+app.use('/api', rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 100
+}));
+
+// Rota para taxa atual
+app.get('/api/exchange-rate', async (req, res) => {
+    try {
+        const cacheKey = 'current_rate';
+        const cached = cache.get(cacheKey);
+        
+        if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+            return res.json(cached.data);
+        }
+
+        const [current, previous] = await Promise.all([
+            api.get('/latest.json', { params: { symbols: 'BRL' } }),
+            api.get('/historical/' + getYesterdayDate() + '.json', { 
+                params: { symbols: 'BRL' } 
+            })
+        ]);
+
+        const data = {
+            rates: { BRL: current.data.rates.BRL },
+            previousRate: previous.data.rates.BRL,
+            timestamp: current.data.timestamp
+        };
+
+        cache.set(cacheKey, {
+            data,
+            timestamp: Date.now()
+        });
+
+        res.json(data);
+    } catch (error) {
+        console.error('Erro ao buscar taxa:', error.response?.data || error.message);
+        res.status(error.response?.status || 500).json({
+            error: 'Erro ao buscar taxa de câmbio'
+        });
+    }
+});
+
+// Rota para dados históricos
+app.get('/api/historical/:date', async (req, res) => {
+    try {
+        const { date } = req.params;
+        const cacheKey = `historical_${date}`;
+        const cached = cache.get(cacheKey);
+
+        if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+            return res.json(cached.data);
+        }
+
+        const response = await api.get(`/historical/${date}.json`, {
+            params: { symbols: 'BRL' }
+        });
+
+        const data = {
+            rates: { BRL: response.data.rates.BRL },
+            timestamp: response.data.timestamp,
+            date
+        };
+
+        cache.set(cacheKey, {
+            data,
+            timestamp: Date.now()
+        });
+
+        res.json(data);
+    } catch (error) {
+        console.error('Erro ao buscar histórico:', error.response?.data || error.message);
+        res.status(error.response?.status || 500).json({
+            error: `Erro ao buscar dados históricos para ${req.params.date}`
+        });
+    }
+});
+
+// Função auxiliar para obter a data de ontem
+function getYesterdayDate() {
+    const date = new Date();
+    date.setDate(date.getDate() - 1);
+    return date.toISOString().split('T')[0];
+}
+
+// Servir arquivos estáticos
 app.use(express.static(clientPath));
 
-// Rota catch-all
+// Rota catch-all para SPA
 app.get('*', (req, res) => {
     res.sendFile(path.join(clientPath, 'index.html'));
 });
 
-// Middleware de erro global
-app.use((err, req, res, next) => {
-    console.error('Erro não tratado:', err);
-    res.status(500).json({ 
-        error: isProduction ? 'Erro interno do servidor' : err.message 
-    });
-});
-
-// Inicialização do servidor
+// Iniciar servidor
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
-    console.log(`Servidor rodando na porta ${PORT} em modo ${isProduction ? 'produção' : 'desenvolvimento'}`);
-    console.log(`Servindo arquivos estáticos de: ${clientPath}`);
+    console.log(`Servidor rodando na porta ${PORT}`);
 });
 
 export default app;
