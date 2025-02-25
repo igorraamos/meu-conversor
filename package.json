@@ -7,20 +7,80 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "test": "echo \"No tests specified\" && exit 0"
+    "client": "live-server client --host=localhost --port=8080 --no-browser",
+    "build": "echo 'No build step required'",
+    "test": "echo \"No tests specified\" && exit 0",
+    "lint": "eslint . --ext .js",
+    "format": "prettier --write \"**/*.{js,json,md}\"",
+    "prepare": "husky install"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/igorraamos/meu-conversor.git"
+  },
+  "keywords": [
+    "conversor",
+    "moedas",
+    "câmbio",
+    "cotação",
+    "tempo-real",
+    "dólar",
+    "real",
+    "exchange-rate"
+  ],
+  "author": "Igor Ramos",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/igorraamos/meu-conversor/issues"
+  },
+  "homepage": "https://github.com/igorraamos/meu-conversor#readme",
   "dependencies": {
-    "axios": "^1.7.9",
     "cors": "^2.8.5",
-    "dotenv": "^16.4.1",
-    "express": "^4.18.2",
-    "express-rate-limit": "^7.1.5",
-    "helmet": "^7.1.0"
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "express-rate-limit": "^7.5.0",
+    "helmet": "^7.2.0",
+    "node-fetch": "^3.3.2"
   },
   "devDependencies": {
-    "nodemon": "^3.0.3"
+    "eslint": "^8.57.1",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-prettier": "^5.2.3",
+    "husky": "^8.0.3",
+    "live-server": "^1.2.2",
+    "nodemon": "^3.1.9",
+    "prettier": "^3.5.1"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
+  "browserslist": [
+    ">0.2%",
+    "not dead",
+    "not ie <= 11",
+    "not op_mini all"
+  ],
+  "prettier": {
+    "singleQuote": true,
+    "trailingComma": "es5",
+    "tabWidth": 2,
+    "semi": true,
+    "printWidth": 100
+  },
+  "eslintConfig": {
+    "env": {
+      "browser": true,
+      "es2022": true,
+      "node": true
+    },
+    "extends": [
+      "eslint:recommended",
+      "plugin:prettier/recommended"
+    ],
+    "parserOptions": {
+      "ecmaVersion": "latest",
+      "sourceType": "module"
+    }
   }
 }

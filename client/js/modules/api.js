@@ -1,35 +1,121 @@
-const CACHE_DURATION = 30000; // 30 segundos
-const cache = new Map();
+import { showError } from './utils.js';
 
-const api = axios.create({
-    baseURL: '/api',
-    timeout: 10000,
+// Configurações
+const CONFIG = {
+    isProduction: window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1',
+    baseUrl: '/api',
     headers: {
         'Accept': 'application/json',
-        'Content-Type': 'application/json'
-    }
-});
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache'
+    },
+    retryAttempts: 3,
+    retryDelay: 1000,
+    requestTimeout: 10000,
+    batchSize: 5,
+    batchDelay: 1000
+};
 
-// Interceptor para retry em caso de erro
-api.interceptors.response.use(null, async error => {
-    if (error.response?.status === 429) {
-        const retryAfter = error.response.headers['retry-after'] || 1;
-        await new Promise(resolve => setTimeout(resolve, retryAfter * 1000));
-        return api.request(error.config);
+// Sistema de cache
+class CacheSystem {
+    constructor(duration = 5 * 60 * 1000) {
+        this.cache = new Map();
+        this.duration = duration;
     }
-    return Promise.reject(error);
-});
 
+    get(key) {
+        const data = this.cache.get(key);
+        if (!data) return null;
+
+        if (Date.now() - data.timestamp > this.duration) {
+            this.cache.delete(key);
+            return null;
+        }
+
+        return data.value;
+    }
+
+    set(key, value) {
+        this.cache.set(key, {
+            value,
+            timestamp: Date.now()
+        });
+    }
+
+    clear() {
+        this.cache.clear();
+    }
+}
+
+const cache = new CacheSystem();
+
+/**
+ * Realiza uma requisição com retry e timeout
+ */
+async function fetchWithRetry(url, options = {}) {
+    let lastError;
+    
+    for (let i = 0; i <= CONFIG.retryAttempts; i++) {
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), CONFIG.requestTimeout);
+            
+            const response = await fetch(url, {
+                ...options,
+                signal: controller.signal,
+                headers: {
+                    ...CONFIG.headers,
+                    ...options.headers
+                }
+            });
+            
+            clearTimeout(timeoutId);
+            
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                if (response.status === 429) {
+                    const retryAfter = response.headers.get('Retry-After');
+                    await new Promise(resolve => 
+                        setTimeout(resolve, (retryAfter ? parseInt(retryAfter) * 1000 : CONFIG.retryDelay))
+                    );
+                    continue;
+                }
+                throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            return data;
+        } catch (error) {
+            lastError = error;
+            
+            if (error.name === 'AbortError') {
+                throw new Error('Requisição excedeu o tempo limite');
+            }
+            
+            if (i < CONFIG.retryAttempts) {
+                await new Promise(resolve => setTimeout(resolve, CONFIG.retryDelay * (i + 1)));
+                continue;
+            }
+        }
+    }
+    
+    throw lastError;
+}
+
+/**
+ * Busca a taxa de câmbio atual
+ * @returns {Promise<{rate: number, previousRate: number}>}
+ */
 export async function fetchExchangeRate() {
     const cacheKey = 'current_rate';
     
     try {
         const cachedData = cache.get(cacheKey);
-        if (cachedData && Date.now() - cachedData.timestamp < CACHE_DURATION) {
-            return cachedData.data;
+        if (cachedData !== null) {
+            return cachedData;
         }
 
-        const { data } = await api.get('/exchange-rate');
+        const data = await fetchWithRetry(`${CONFIG.baseUrl}/exchange-rate`);
         
         if (!data || !data.rates || typeof data.rates.BRL !== 'number') {
             throw new Error('Formato de resposta inválido');
@@ -37,80 +123,117 @@ export async function fetchExchangeRate() {
 
         const exchangeData = {
             rate: data.rates.BRL,
-            previousRate: data.previousRate || null,
-            timestamp: data.timestamp || Date.now()
+            previousRate: data.previousRate || null
         };
 
-        cache.set(cacheKey, {
-            data: exchangeData,
-            timestamp: Date.now()
-        });
-
+        cache.set(cacheKey, exchangeData);
         return exchangeData;
     } catch (error) {
         console.error('Erro ao buscar taxa de câmbio:', error);
-        throw error;
+        showError('Erro ao buscar cotação atual. Tentando novamente em 5 segundos...');
+        
+        // Tentar novamente após 5 segundos
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        return fetchExchangeRate();
     }
 }
 
+/**
+ * Busca taxas históricas em lotes
+ */
+async function fetchHistoricalBatch(dates) {
+    const results = [];
+    let consecutiveErrors = 0;
+    const maxConsecutiveErrors = 3;
+    
+    for (let i = 0; i < dates.length; i += CONFIG.batchSize) {
+        const batch = dates.slice(i, i + CONFIG.batchSize);
+        const batchPromises = batch.map(async date => {
+            try {
+                const data = await fetchWithRetry(`${CONFIG.baseUrl}/historical/${date}`);
+
+                if (!data || !data.rates || typeof data.rates.BRL !== 'number') {
+                    console.warn(`Dados inválidos para ${date}`);
+                    return null;
+                }
+
+                consecutiveErrors = 0; // Resetar contador de erros em caso de sucesso
+                return {
+                    date,
+                    rate: data.rates.BRL
+                };
+            } catch (error) {
+                console.warn(`Erro ao buscar dados para ${date}:`, error);
+                consecutiveErrors++;
+                
+                if (consecutiveErrors >= maxConsecutiveErrors) {
+                    throw new Error('Múltiplas falhas consecutivas ao buscar dados');
+                }
+                
+                return null;
+            }
+        });
+
+        try {
+            const batchResults = await Promise.all(batchPromises);
+            const validResults = batchResults.filter(item => item !== null);
+            
+            if (validResults.length > 0) {
+                results.push(...validResults);
+            }
+            
+            if (i + CONFIG.batchSize < dates.length) {
+                await new Promise(resolve => setTimeout(resolve, CONFIG.batchDelay));
+            }
+        } catch (error) {
+            if (consecutiveErrors >= maxConsecutiveErrors) {
+                throw error;
+            }
+        }
+    }
+    
+    if (results.length === 0) {
+        throw new Error('Nenhum dado histórico válido encontrado');
+    }
+    
+    return results;
+}
+
+/**
+ * Busca taxas de câmbio históricas
+ */
 export async function getHistoricalRates(period) {
     const cacheKey = `historical_${period}`;
-    const BATCH_SIZE = 5;
     
     try {
         const cachedData = cache.get(cacheKey);
-        if (cachedData && Date.now() - cachedData.timestamp < CACHE_DURATION) {
-            return cachedData.data;
+        if (cachedData !== null && cachedData.length > 0) {
+            return cachedData;
         }
 
         const dates = calculateDateRange(period);
-        const results = [];
-
-        for (let i = 0; i < dates.length; i += BATCH_SIZE) {
-            const batch = dates.slice(i, i + BATCH_SIZE);
-            const batchPromises = batch.map(date => 
-                api.get(`/historical/${date}`)
-                    .then(response => ({
-                        date,
-                        rate: response.data.rates.BRL,
-                        timestamp: response.data.timestamp
-                    }))
-                    .catch(error => {
-                        console.warn(`Erro ao buscar dados para ${date}:`, error);
-                        return null;
-                    })
-            );
-
-            const batchResults = await Promise.allSettled(batchPromises);
-            const validResults = batchResults
-                .filter(result => result.status === 'fulfilled' && result.value)
-                .map(result => result.value);
-
-            results.push(...validResults);
-
-            if (i + BATCH_SIZE < dates.length) {
-                await new Promise(resolve => setTimeout(resolve, 1000));
-            }
-        }
+        const results = await fetchHistoricalBatch(dates);
 
         if (results.length === 0) {
             throw new Error('Nenhum dado histórico válido encontrado');
         }
 
         results.sort((a, b) => new Date(a.date) - new Date(b.date));
-        
-        cache.set(cacheKey, {
-            data: results,
-            timestamp: Date.now()
-        });
+        cache.set(cacheKey, results);
 
         return results;
     } catch (error) {
         console.error('Erro ao buscar taxas históricas:', error);
-        throw error;
+        showError('Erro ao buscar dados históricos. Tentando novamente em 5 segundos...');
+        
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        return getHistoricalRates(period);
     }
 }
 
+/**
+ * Calcula o intervalo de datas para o período
+ */
 function calculateDateRange(period) {
     const endDate = new Date();
     const startDate = new Date();
@@ -143,3 +266,9 @@ function calculateDateRange(period) {
 export function clearCache() {
     cache.clear();
 }
+
+export const apiConfig = {
+    ...CONFIG,
+    clearCache,
+    isCached: (key) => cache.get(key) !== null
+};

@@ -1,26 +1,21 @@
 # Configurações de Build
 [build]
-  publish = "client"
+  publish = "."
   command = "npm install"
   functions = "netlify/functions"
 
 [build.environment]
   NODE_VERSION = "18"
-  NPM_FLAGS = "--no-optional"
 
-# Configurações das Functions
 [functions]
   node_bundler = "esbuild"
-  external_node_modules = ["axios"]
-  included_files = ["netlify/functions/**/*"]
+  external_node_modules = ["node-fetch"]
 
-# Configurações de Desenvolvimento
 [dev]
-  publish = "client"
-  port = 8080
-  targetPort = 8080
+  publish = "."
+  port = 3000
+  targetPort = 3000
   framework = "#static"
-  autoLaunch = false
 
 # Redirecionamentos da API
 [[redirects]]
@@ -31,54 +26,23 @@
   [redirects.headers]
     Access-Control-Allow-Origin = "*"
     Access-Control-Allow-Methods = "GET, OPTIONS"
-    Access-Control-Allow-Headers = "Content-Type, Authorization"
-    Cache-Control = "public, s-maxage=30"
 
 [[redirects]]
   from = "/api/historical/*"
-  to = "/.netlify/functions/exchange-rate"
+  to = "/.netlify/functions/historical-rate/:splat"
   status = 200
   force = true
   [redirects.headers]
     Access-Control-Allow-Origin = "*"
     Access-Control-Allow-Methods = "GET, OPTIONS"
-    Access-Control-Allow-Headers = "Content-Type, Authorization"
-    Cache-Control = "public, s-maxage=30"
 
-# Redirecionamento SPA
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
 
-# Headers Globais
 [[headers]]
   for = "/*"
   [headers.values]
-    X-Frame-Options = "DENY"
-    X-XSS-Protection = "1; mode=block"
-    X-Content-Type-Options = "nosniff"
-    Referrer-Policy = "strict-origin-when-cross-origin"
-    Permissions-Policy = "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()"
-
-# Cache para recursos estáticos
-[[headers]]
-  for = "/assets/*"
-  [headers.values]
-    Cache-Control = "public, max-age=31536000, immutable"
-
-[[headers]]
-  for = "/*.js"
-  [headers.values]
-    Cache-Control = "public, max-age=31536000, immutable"
-
-[[headers]]
-  for = "/*.css"
-  [headers.values]
-    Cache-Control = "public, max-age=31536000, immutable"
-
-[[headers]]
-  for = "/api/*"
-  [headers.values]
     Access-Control-Allow-Origin = "*"
-    Cache-Control = "public, s-maxage=30"
+    Cache-Control = "no-cache"
