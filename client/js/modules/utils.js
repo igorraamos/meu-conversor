@@ -1,4 +1,6 @@
-// Configurações
+/**
+ * Configurações globais
+ */
 const CONFIG = {
     ERROR_DISPLAY_TIME: 5000,
     DATE_FORMAT_OPTIONS: {
@@ -13,45 +15,55 @@ const CONFIG = {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2
     },
+    CURRENCY_FORMAT_OPTIONS: {
+        BRL: {
+            style: 'currency',
+            currency: 'BRL',
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        },
+        USD: {
+            style: 'currency',
+            currency: 'USD',
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        }
+    },
     ANIMATION_DURATION: 300
 };
 
 /**
- * Formata um valor monetário
+ * Formata um número para moeda
  * @param {number} value - Valor a ser formatado
- * @param {string} currency - Código da moeda (USD ou BRL)
+ * @param {string} [currency=''] - Código da moeda (BRL ou USD)
  * @returns {string} Valor formatado
  */
-export function formatCurrency(value, currency = 'BRL') {
+export function formatCurrency(value, currency = '') {
+    if (typeof value !== 'number' || isNaN(value)) return currency === 'BRL' ? 'R$ 0,00' : '$ 0.00';
+    
     try {
-        return new Intl.NumberFormat('pt-BR', {
-            style: 'currency',
-            currency: currency
-        }).format(value);
+        if (!currency) {
+            return value.toLocaleString('pt-BR', CONFIG.NUMBER_FORMAT_OPTIONS);
+        }
+
+        return new Intl.NumberFormat('pt-BR', CONFIG.CURRENCY_FORMAT_OPTIONS[currency])
+            .format(value);
     } catch (error) {
         console.warn('Erro ao formatar moeda:', error);
-        return currency === 'BRL' ? 'R$ 0,00' : 'US$ 0.00';
+        return currency === 'BRL' ? 'R$ 0,00' : '$ 0.00';
     }
 }
 
 /**
- * Formata um número
+ * Formata um número sem símbolo de moeda
  * @param {number} value - Valor a ser formatado
- * @param {string} [currency=''] - Código da moeda (opcional)
+ * @returns {string} Valor formatado
  */
-export function formatNumber(value, currency = '') {
+export function formatNumber(value) {
     if (typeof value !== 'number' || isNaN(value)) return "0,00";
     
     try {
-        const formatted = value.toLocaleString('pt-BR', {
-            ...CONFIG.NUMBER_FORMAT_OPTIONS,
-            ...(currency && {
-                style: 'currency',
-                currency: currency
-            })
-        });
-        
-        return currency ? formatted : formatted.replace(/^R\$\s?/, '');
+        return value.toLocaleString('pt-BR', CONFIG.NUMBER_FORMAT_OPTIONS);
     } catch (error) {
         console.warn('Erro ao formatar número:', error);
         return "0,00";
@@ -61,11 +73,16 @@ export function formatNumber(value, currency = '') {
 /**
  * Converte string formatada em número
  * @param {string} value - Valor formatado
+ * @returns {number} Valor numérico
  */
 export function unformatNumber(value) {
     if (!value) return 0;
     try {
-        return parseFloat(value.replace(/[^\d,.-]/g, '').replace(/\./g, '').replace(',', '.')) || 0;
+        const cleaned = value.toString()
+            .replace(/[^\d,.-]/g, '')
+            .replace(/\./g, '')
+            .replace(',', '.');
+        return parseFloat(cleaned) || 0;
     } catch (error) {
         console.warn('Erro ao converter número:', error);
         return 0;
@@ -73,51 +90,60 @@ export function unformatNumber(value) {
 }
 
 /**
- * Exibe mensagem de erro
- * @param {string} message - Mensagem de erro
- * @param {string} [type='error'] - Tipo de mensagem
+ * Exibe mensagem de feedback com animação
+ * @param {string} message - Mensagem a ser exibida
+ * @param {string} [type='error'] - Tipo de mensagem ('error', 'warning', 'success')
  */
 export function showError(message, type = 'error') {
-    const errorContainer = document.getElementById("error-container");
-    if (!errorContainer) return;
+    const container = document.getElementById("error-container");
+    if (!container) return;
 
-    if (errorContainer.style.display === "block") {
-        clearTimeout(errorContainer.timeoutId);
+    // Limpa mensagem anterior
+    if (container.style.display === "block") {
+        clearTimeout(container.timeoutId);
     }
 
-    errorContainer.className = `message-container ${type}`;
-    errorContainer.textContent = message;
+    // Configura nova mensagem
+    container.className = `message-container ${type}`;
+    container.textContent = message;
+    container.setAttribute('role', 'alert');
+    container.setAttribute('aria-live', 'polite');
 
-    errorContainer.style.opacity = "0";
-    errorContainer.style.display = "block";
+    // Anima entrada
+    container.style.opacity = "0";
+    container.style.display = "block";
     
     requestAnimationFrame(() => {
-        errorContainer.style.transition = `opacity ${CONFIG.ANIMATION_DURATION}ms ease-in-out`;
-        errorContainer.style.opacity = "1";
+        container.style.transition = `opacity ${CONFIG.ANIMATION_DURATION}ms ease-in-out`;
+        container.style.opacity = "1";
     });
 
-    errorContainer.timeoutId = setTimeout(() => {
-        errorContainer.style.opacity = "0";
+    // Configura saída
+    container.timeoutId = setTimeout(() => {
+        container.style.opacity = "0";
         setTimeout(() => {
-            errorContainer.style.display = "none";
+            container.style.display = "none";
         }, CONFIG.ANIMATION_DURATION);
     }, CONFIG.ERROR_DISPLAY_TIME);
 }
 
 /**
- * Formata data
+ * Formata data para o formato brasileiro
  * @param {Date|string} date - Data a ser formatada
  * @param {boolean} [includeTime=true] - Incluir horário
+ * @returns {string} Data formatada
  */
 export function formatDate(date, includeTime = true) {
     try {
         const dateObj = typeof date === 'string' ? new Date(date) : date;
         const options = {
-            ...CONFIG.DATE_FORMAT_OPTIONS,
-            ...(includeTime ? {} : {
-                hour: undefined,
-                minute: undefined,
-                second: undefined
+            day: '2-digit',
+            month: includeTime ? 'long' : '2-digit',
+            year: 'numeric',
+            ...(includeTime && {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
             })
         };
         return dateObj.toLocaleString('pt-BR', options);
@@ -128,48 +154,39 @@ export function formatDate(date, includeTime = true) {
 }
 
 /**
- * Atualiza o horário local
+ * Atualiza o horário local na interface
  */
 export function updateLocalTime() {
-    const localTimeElement = document.getElementById("local-time-value");
-    if (!localTimeElement) return;
+    const element = document.getElementById("local-time-value");
+    if (!element) return;
 
     try {
         const now = new Date();
-        localTimeElement.textContent = formatDate(now);
+        element.textContent = formatDate(now);
     } catch (error) {
         console.warn('Erro ao atualizar horário:', error);
     }
 }
 
 /**
- * Calcula variação percentual
+ * Calcula variação percentual entre valores
  * @param {number} current - Valor atual
  * @param {number} previous - Valor anterior
+ * @returns {string} Variação formatada
  */
 export function calculateVariation(current, previous) {
     if (!previous || !current) return '0,00%';
     
     const variation = ((current - previous) / previous) * 100;
-    const sign = variation > 0 ? '+' : '';
+    const sign = variation >= 0 ? '+' : '';
     return `${sign}${formatNumber(variation)}%`;
-}
-
-/**
- * Valida valor monetário
- * @param {string|number} value - Valor a ser validado
- */
-export function isValidMoneyValue(value) {
-    if (typeof value === 'number') {
-        return !isNaN(value) && isFinite(value) && value >= 0;
-    }
-    return /^[\d.,]*$/.test(value);
 }
 
 /**
  * Cria função com debounce
  * @param {Function} func - Função a ser debounced
  * @param {number} wait - Tempo de espera em ms
+ * @returns {Function} Função com debounce
  */
 export function debounce(func, wait) {
     let timeout;
@@ -184,27 +201,16 @@ export function debounce(func, wait) {
 }
 
 /**
- * Inicializa relógio local
+ * Valida valor monetário
+ * @param {string|number} value - Valor a ser validado
+ * @returns {boolean} Verdadeiro se válido
  */
-export function initializeLocalTime() {
-    updateLocalTime();
-    return setInterval(updateLocalTime, 1000);
+export function isValidMoneyValue(value) {
+    if (typeof value === 'number') {
+        return !isNaN(value) && isFinite(value) && value >= 0;
+    }
+    return /^[\d.,]*$/.test(value);
 }
 
-// Exporta configurações
+// Configurações públicas
 export const utilsConfig = { ...CONFIG };
-
-// Exporta todas as funções em um objeto
-export default {
-    formatCurrency,
-    formatNumber,
-    unformatNumber,
-    showError,
-    formatDate,
-    updateLocalTime,
-    calculateVariation,
-    isValidMoneyValue,
-    debounce,
-    initializeLocalTime,
-    utilsConfig
-};

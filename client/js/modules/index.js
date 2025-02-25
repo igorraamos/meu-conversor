@@ -1,28 +1,177 @@
-// Importações usando ES modules
-import { fetchExchangeRate, getHistoricalRates } from './api.js';
-import { formatCurrency, formatDate, showError } from './utils.js';
-
-// Cache do DOM
-const elements = {
-    usdInput: document.getElementById('usd-input'),
-    brlInput: document.getElementById('brl-input'),
-    currentDollarValue: document.getElementById('current-dollar-value'),
-    chartButtons: document.querySelectorAll('.chart-buttons button'),
-    localTimeValue: document.getElementById('local-time-value'),
-    themeToggle: document.getElementById('toggle-theme'),
-    chart: document.getElementById('chart'),
-    variationElement: document.querySelector('.variacao')
+// Configurações
+const CONFIG = {
+    ERROR_DISPLAY_TIME: 5000,
+    DATE_FORMAT_OPTIONS: {
+        day: "2-digit",
+        month: "long",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit"
+    },
+    NUMBER_FORMAT_OPTIONS: {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    },
+    ANIMATION_DURATION: 300
 };
 
-// Estado da aplicação
-const state = {
-    currentRate: 0,
-    chart: null,
-    updateInterval: null
-};
+/**
+ * Formata um valor monetário
+ * @param {number} value - Valor a ser formatado
+ * @param {string} currency - Código da moeda (USD ou BRL)
+ * @returns {string} Valor formatado
+ */
+export function formatCurrency(value, currency = 'BRL') {
+    try {
+        return new Intl.NumberFormat('pt-BR', {
+            style: 'currency',
+            currency: currency
+        }).format(value);
+    } catch (error) {
+        console.warn('Erro ao formatar moeda:', error);
+        return currency === 'BRL' ? 'R$ 0,00' : 'US$ 0.00';
+    }
+}
 
-// Função para debounce de inputs
-const debounce = (func, wait) => {
+/**
+ * Formata um número
+ * @param {number} value - Valor a ser formatado
+ * @param {string} [currency=''] - Código da moeda (opcional)
+ */
+export function formatNumber(value, currency = '') {
+    if (typeof value !== 'number' || isNaN(value)) return "0,00";
+    
+    try {
+        const formatted = value.toLocaleString('pt-BR', {
+            ...CONFIG.NUMBER_FORMAT_OPTIONS,
+            ...(currency && {
+                style: 'currency',
+                currency: currency
+            })
+        });
+        
+        return currency ? formatted : formatted.replace(/^R\$\s?/, '');
+    } catch (error) {
+        console.warn('Erro ao formatar número:', error);
+        return "0,00";
+    }
+}
+
+/**
+ * Converte string formatada em número
+ * @param {string} value - Valor formatado
+ */
+export function unformatNumber(value) {
+    if (!value) return 0;
+    try {
+        return parseFloat(value.replace(/[^\d,.-]/g, '').replace(/\./g, '').replace(',', '.')) || 0;
+    } catch (error) {
+        console.warn('Erro ao converter número:', error);
+        return 0;
+    }
+}
+
+/**
+ * Exibe mensagem de erro
+ * @param {string} message - Mensagem de erro
+ * @param {string} [type='error'] - Tipo de mensagem
+ */
+export function showError(message, type = 'error') {
+    const errorContainer = document.getElementById("error-container");
+    if (!errorContainer) return;
+
+    if (errorContainer.style.display === "block") {
+        clearTimeout(errorContainer.timeoutId);
+    }
+
+    errorContainer.className = `message-container ${type}`;
+    errorContainer.textContent = message;
+
+    errorContainer.style.opacity = "0";
+    errorContainer.style.display = "block";
+    
+    requestAnimationFrame(() => {
+        errorContainer.style.transition = `opacity ${CONFIG.ANIMATION_DURATION}ms ease-in-out`;
+        errorContainer.style.opacity = "1";
+    });
+
+    errorContainer.timeoutId = setTimeout(() => {
+        errorContainer.style.opacity = "0";
+        setTimeout(() => {
+            errorContainer.style.display = "none";
+        }, CONFIG.ANIMATION_DURATION);
+    }, CONFIG.ERROR_DISPLAY_TIME);
+}
+
+/**
+ * Formata data
+ * @param {Date|string} date - Data a ser formatada
+ * @param {boolean} [includeTime=true] - Incluir horário
+ */
+export function formatDate(date, includeTime = true) {
+    try {
+        const dateObj = typeof date === 'string' ? new Date(date) : date;
+        const options = {
+            ...CONFIG.DATE_FORMAT_OPTIONS,
+            ...(includeTime ? {} : {
+                hour: undefined,
+                minute: undefined,
+                second: undefined
+            })
+        };
+        return dateObj.toLocaleString('pt-BR', options);
+    } catch (error) {
+        console.warn('Erro ao formatar data:', error);
+        return '';
+    }
+}
+
+/**
+ * Atualiza o horário local
+ */
+export function updateLocalTime() {
+    const localTimeElement = document.getElementById("local-time-value");
+    if (!localTimeElement) return;
+
+    try {
+        const now = new Date();
+        localTimeElement.textContent = formatDate(now);
+    } catch (error) {
+        console.warn('Erro ao atualizar horário:', error);
+    }
+}
+
+/**
+ * Calcula variação percentual
+ * @param {number} current - Valor atual
+ * @param {number} previous - Valor anterior
+ */
+export function calculateVariation(current, previous) {
+    if (!previous || !current) return '0,00%';
+    
+    const variation = ((current - previous) / previous) * 100;
+    const sign = variation > 0 ? '+' : '';
+    return `${sign}${formatNumber(variation)}%`;
+}
+
+/**
+ * Valida valor monetário
+ * @param {string|number} value - Valor a ser validado
+ */
+export function isValidMoneyValue(value) {
+    if (typeof value === 'number') {
+        return !isNaN(value) && isFinite(value) && value >= 0;
+    }
+    return /^[\d.,]*$/.test(value);
+}
+
+/**
+ * Cria função com debounce
+ * @param {Function} func - Função a ser debounced
+ * @param {number} wait - Tempo de espera em ms
+ */
+export function debounce(func, wait) {
     let timeout;
     return function executedFunction(...args) {
         const later = () => {
@@ -32,249 +181,30 @@ const debounce = (func, wait) => {
         clearTimeout(timeout);
         timeout = setTimeout(later, wait);
     };
-};
-
-// Funções de UI
-function updateLocalTime() {
-    if (!elements.localTimeValue) return;
-    const now = new Date();
-    elements.localTimeValue.textContent = formatDate(now);
 }
 
-function updateDollarValue(rate, previousRate) {
-    if (!elements.currentDollarValue || !elements.variationElement) return;
-    
-    elements.currentDollarValue.textContent = formatCurrency(rate, 'BRL').replace('R$ ', '');
-    
-    if (previousRate) {
-        const variation = ((rate - previousRate) / previousRate) * 100;
-        elements.variationElement.textContent = `(${variation >= 0 ? '+' : ''}${variation.toFixed(2)}% em relação a ontem)`;
-        elements.variationElement.className = `variacao ${variation >= 0 ? 'positive' : 'negative'}`;
-    }
+/**
+ * Inicializa relógio local
+ */
+export function initializeLocalTime() {
+    updateLocalTime();
+    return setInterval(updateLocalTime, 1000);
 }
 
-// Funções do gráfico
-function initChart() {
-    if (!elements.chart) return;
-    
-    const ctx = elements.chart.getContext('2d');
-    state.chart = new Chart(ctx, {
-        type: 'line',
-        data: {
-            datasets: [{
-                label: 'Cotação do Dólar',
-                borderColor: '#2ecc71',
-                backgroundColor: 'rgba(46, 204, 113, 0.1)',
-                borderWidth: 2,
-                pointRadius: 3,
-                pointBackgroundColor: '#2ecc71',
-                tension: 0.4,
-                data: []
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { display: false },
-                tooltip: {
-                    mode: 'index',
-                    intersect: false,
-                    callbacks: {
-                        label: (context) => `R$ ${context.parsed.y.toFixed(2)}`
-                    }
-                }
-            },
-            scales: {
-                x: {
-                    type: 'time',
-                    time: {
-                        unit: 'day',
-                        displayFormats: { day: 'dd/MM' }
-                    },
-                    grid: { display: false }
-                },
-                y: {
-                    beginAtZero: false,
-                    grid: { color: 'rgba(0, 0, 0, 0.1)' }
-                }
-            }
-        }
-    });
-}
+// Exporta configurações
+export const utilsConfig = { ...CONFIG };
 
-async function updateChart(period) {
-    try {
-        const data = await getHistoricalRates(period);
-        if (!data?.length) throw new Error('Dados históricos não disponíveis');
-
-        const chartData = data.map(item => ({
-            x: new Date(item.date),
-            y: item.rate
-        }));
-
-        if (state.chart) {
-            state.chart.data.datasets[0].data = chartData;
-            state.chart.update('show');
-        }
-
-        updateVariations(data);
-    } catch (error) {
-        console.error('Erro ao atualizar gráfico:', error);
-        showError('Erro ao carregar dados históricos');
-    }
-}
-
-function updateVariations(data) {
-    if (!data?.length || data.length < 2) return;
-
-    elements.chartButtons?.forEach(button => {
-        const period = button.dataset.period;
-        const periodData = filterDataByPeriod(data, period);
-        
-        if (periodData.length >= 2) {
-            const firstRate = periodData[0].rate;
-            const lastRate = periodData[periodData.length - 1].rate;
-            const variation = ((lastRate - firstRate) / firstRate) * 100;
-            
-            const variationSpan = button.querySelector('.variation');
-            if (variationSpan) {
-                variationSpan.textContent = `${variation >= 0 ? '+' : ''}${variation.toFixed(2)}%`;
-                variationSpan.className = `variation ${variation >= 0 ? 'positive' : 'negative'}`;
-            }
-        }
-    });
-}
-
-function filterDataByPeriod(data, period) {
-    const now = new Date();
-    let startDate = new Date();
-    
-    switch(period) {
-        case '7d': startDate.setDate(now.getDate() - 7); break;
-        case '1m': startDate.setMonth(now.getMonth() - 1); break;
-        case '6m': startDate.setMonth(now.getMonth() - 6); break;
-        case '1y': startDate.setFullYear(now.getFullYear() - 1); break;
-    }
-    
-    return data.filter(item => new Date(item.date) >= startDate);
-}
-
-// Funções de conversão
-function convertValues(value, fromUSD = true) {
-    if (!value) return '';
-    
-    const numericValue = parseFloat(value.replace(/[^0-9.,]/g, '').replace(',', '.'));
-    if (isNaN(numericValue)) return '';
-    
-    return fromUSD ? 
-        formatCurrency(numericValue * state.currentRate, 'BRL') :
-        formatCurrency(numericValue / state.currentRate, 'USD');
-}
-
-// Event Listeners com debounce
-function setupEventListeners() {
-    const handleUSDInput = debounce((e) => {
-        elements.brlInput.value = convertValues(e.target.value, true);
-    }, 300);
-
-    const handleBRLInput = debounce((e) => {
-        elements.usdInput.value = convertValues(e.target.value, false);
-    }, 300);
-
-    elements.usdInput?.addEventListener('input', handleUSDInput);
-    elements.brlInput?.addEventListener('input', handleBRLInput);
-
-    elements.chartButtons?.forEach(button => {
-        button.addEventListener('click', () => {
-            elements.chartButtons.forEach(btn => btn.classList.remove('active'));
-            button.classList.add('active');
-            updateChart(button.dataset.period);
-        });
-    });
-
-    elements.themeToggle?.addEventListener('click', () => {
-        const body = document.body;
-        const newTheme = body.dataset.theme === 'light' ? 'dark' : 'light';
-        body.dataset.theme = newTheme;
-        localStorage.setItem('theme', newTheme);
-    });
-}
-
-// Atualização automática com retry
-async function setupAutoUpdate() {
-    const updateRate = async (retryCount = 0) => {
-        try {
-            const data = await fetchExchangeRate();
-            if (data.rate !== state.currentRate) {
-                state.currentRate = data.rate;
-                updateDollarValue(data.rate, data.previousRate);
-
-                if (elements.usdInput.value) {
-                    elements.brlInput.value = convertValues(elements.usdInput.value, true);
-                } else if (elements.brlInput.value) {
-                    elements.usdInput.value = convertValues(elements.brlInput.value, false);
-                }
-            }
-        } catch (error) {
-            console.error('Erro na atualização:', error);
-            if (retryCount < 3) {
-                setTimeout(() => updateRate(retryCount + 1), 5000);
-            }
-        }
-    };
-
-    if (state.updateInterval) {
-        clearInterval(state.updateInterval);
-    }
-
-    // Primeira atualização
-    await updateRate();
-
-    // Atualizações subsequentes
-    state.updateInterval = setInterval(updateRate, 30000);
-}
-
-// Inicialização
-async function init() {
-    try {
-        // Tema
-        document.body.dataset.theme = localStorage.getItem('theme') || 'light';
-
-        // Componentes
-        initChart();
-        setupEventListeners();
-        
-        // Hora local
-        updateLocalTime();
-        setInterval(updateLocalTime, 1000);
-
-        // Dados iniciais
-        const data = await fetchExchangeRate();
-        state.currentRate = data.rate;
-        updateDollarValue(data.rate, data.previousRate);
-
-        // Gráfico inicial
-        const activeButton = document.querySelector('.chart-buttons button.active');
-        if (activeButton) {
-            await updateChart(activeButton.dataset.period);
-        }
-
-        // Atualizações automáticas
-        await setupAutoUpdate();
-
-    } catch (error) {
-        console.error('Erro na inicialização:', error);
-        showError('Erro ao carregar dados iniciais');
-    }
-}
-
-// Inicialização quando o DOM estiver pronto
-document.addEventListener('DOMContentLoaded', init);
-
-// Exportações
-export const converter = {
-    updateChart,
-    convertValues,
-    updateLocalTime
+// Exporta todas as funções em um objeto
+export default {
+    formatCurrency,
+    formatNumber,
+    unformatNumber,
+    showError,
+    formatDate,
+    updateLocalTime,
+    calculateVariation,
+    isValidMoneyValue,
+    debounce,
+    initializeLocalTime,
+    utilsConfig
 };
