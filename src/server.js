@@ -7,11 +7,13 @@ import axios from 'axios';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+// Configuração do ambiente
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const clientPath = path.join(__dirname, '../client');
+const isProduction = process.env.NODE_ENV === 'production';
 
-// Configuração do Axios
+// Configuração do Axios para OpenExchangeRates
 const api = axios.create({
     baseURL: 'https://openexchangerates.org/api',
     timeout: 10000,
@@ -26,7 +28,7 @@ const CACHE_DURATION = 30000; // 30 segundos
 
 const app = express();
 
-// Middlewares básicos
+// Middlewares
 app.use(cors());
 app.use(express.json());
 app.use(helmet({
@@ -37,10 +39,13 @@ app.use(helmet({
 // Rate limiting
 app.use('/api', rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 100
+    max: isProduction ? 100 : 1000,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Muitas requisições, tente novamente mais tarde' }
 }));
 
-// Rota para taxa atual
+// Rotas da API
 app.get('/api/exchange-rate', async (req, res) => {
     try {
         const cacheKey = 'current_rate';
@@ -77,7 +82,6 @@ app.get('/api/exchange-rate', async (req, res) => {
     }
 });
 
-// Rota para dados históricos
 app.get('/api/historical/:date', async (req, res) => {
     try {
         const { date } = req.params;
@@ -130,7 +134,7 @@ app.get('*', (req, res) => {
 // Iniciar servidor
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
-    console.log(`Servidor rodando na porta ${PORT}`);
+    console.log(`Servidor rodando na porta ${PORT} em modo ${isProduction ? 'produção' : 'desenvolvimento'}`);
 });
 
 export default app;
