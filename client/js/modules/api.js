@@ -13,12 +13,13 @@ const CONFIG = {
     retryDelay: 1000,
     requestTimeout: 10000,
     batchSize: 5,
-    batchDelay: 1000
+    batchDelay: 1000,
+    cacheDuration: 30 * 1000 // 30 segundos de cache
 };
 
 // Sistema de cache
 class CacheSystem {
-    constructor(duration = 5 * 60 * 1000) {
+    constructor(duration = CONFIG.cacheDuration) {
         this.cache = new Map();
         this.duration = duration;
     }
@@ -93,7 +94,7 @@ async function fetchWithRetry(url, options = {}) {
             }
             
             if (i < CONFIG.retryAttempts) {
-                await new Promise(resolve => setTimeout(resolve, CONFIG.retryDelay * (i + 1)));
+                await new Promise(resolve => setTimeout(resolve, CONFIG.retryDelay * Math.pow(2, i)));
                 continue;
             }
         }
@@ -123,7 +124,8 @@ export async function fetchExchangeRate() {
 
         const exchangeData = {
             rate: data.rates.BRL,
-            previousRate: data.previousRate || null
+            previousRate: data.previousRate || null,
+            timestamp: data.timestamp || Date.now()
         };
 
         cache.set(cacheKey, exchangeData);
@@ -132,14 +134,16 @@ export async function fetchExchangeRate() {
         console.error('Erro ao buscar taxa de câmbio:', error);
         showError('Erro ao buscar cotação atual. Tentando novamente em 5 segundos...');
         
-        // Tentar novamente após 5 segundos
-        await new Promise(resolve => setTimeout(resolve, 5000));
+        // Tentar novamente após 5 segundos com backoff exponencial
+        const retryDelay = Math.min(5000 * Math.pow(2, cache.get('retryCount') || 0), 30000);
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+        cache.set('retryCount', (cache.get('retryCount') || 0) + 1);
         return fetchExchangeRate();
     }
 }
 
 /**
- * Busca taxas históricas em lotes
+ * Busca taxas históricas em lotes otimizados
  */
 async function fetchHistoricalBatch(dates) {
     const results = [];
@@ -149,6 +153,13 @@ async function fetchHistoricalBatch(dates) {
     for (let i = 0; i < dates.length; i += CONFIG.batchSize) {
         const batch = dates.slice(i, i + CONFIG.batchSize);
         const batchPromises = batch.map(async date => {
+            const cacheKey = `historical_${date}`;
+            const cachedData = cache.get(cacheKey);
+            
+            if (cachedData !== null) {
+                return cachedData;
+            }
+
             try {
                 const data = await fetchWithRetry(`${CONFIG.baseUrl}/historical/${date}`);
 
@@ -157,11 +168,15 @@ async function fetchHistoricalBatch(dates) {
                     return null;
                 }
 
-                consecutiveErrors = 0; // Resetar contador de erros em caso de sucesso
-                return {
+                consecutiveErrors = 0;
+                const result = {
                     date,
-                    rate: data.rates.BRL
+                    rate: data.rates.BRL,
+                    timestamp: data.timestamp || new Date(date).getTime()
                 };
+                
+                cache.set(cacheKey, result);
+                return result;
             } catch (error) {
                 console.warn(`Erro ao buscar dados para ${date}:`, error);
                 consecutiveErrors++;
@@ -200,7 +215,7 @@ async function fetchHistoricalBatch(dates) {
 }
 
 /**
- * Busca taxas de câmbio históricas
+ * Busca taxas de câmbio históricas com cache otimizado
  */
 export async function getHistoricalRates(period) {
     const cacheKey = `historical_${period}`;
@@ -208,7 +223,12 @@ export async function getHistoricalRates(period) {
     try {
         const cachedData = cache.get(cacheKey);
         if (cachedData !== null && cachedData.length > 0) {
-            return cachedData;
+            // Verificar se os dados ainda são válidos para o período atual
+            const lastDate = new Date(cachedData[cachedData.length - 1].date);
+            const now = new Date();
+            if (lastDate.toDateString() === now.toDateString()) {
+                return cachedData;
+            }
         }
 
         const dates = calculateDateRange(period);
@@ -226,7 +246,9 @@ export async function getHistoricalRates(period) {
         console.error('Erro ao buscar taxas históricas:', error);
         showError('Erro ao buscar dados históricos. Tentando novamente em 5 segundos...');
         
-        await new Promise(resolve => setTimeout(resolve, 5000));
+        const retryDelay = Math.min(5000 * Math.pow(2, cache.get('historyRetryCount') || 0), 30000);
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+        cache.set('historyRetryCount', (cache.get('historyRetryCount') || 0) + 1);
         return getHistoricalRates(period);
     }
 }
