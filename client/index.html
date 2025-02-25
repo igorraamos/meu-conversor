@@ -26,12 +26,12 @@
     <link rel="stylesheet" href="css/style.css">
     
     <!-- Dependências externas -->
-    <script src="https://cdn.jsdelivr.net/npm/axios@1.6.7/dist/axios.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/date-fns@2.29.3/dist/date-fns.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/date-fns@2.29.3/locale/pt-BR/index.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@2.0.1/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
-<script type="module" src="js/modules/index.js"></script>
+    <!-- Dependências externas - carregadas antes dos módulos -->
+    <script defer src="https://cdn.jsdelivr.net/npm/axios@1.6.7/dist/axios.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/date-fns@2.29.3/dist/date-fns.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/date-fns@2.29.3/locale/pt-BR/index.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@2.0.1/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
 </head>
 <body data-theme="light">
     <div id="error-container" class="message-container" role="alert" aria-live="polite"></div>

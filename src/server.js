@@ -7,24 +7,13 @@ import axios from 'axios';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-// Configuração do ambiente
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const clientPath = path.join(__dirname, '../client');
+
 const isProduction = process.env.NODE_ENV === 'production';
 
-// Rate limiting mais permissivo para desenvolvimento
-const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutos
-    max: isProduction ? 100 : 1000, // limite por IP
-    message: { error: 'Muitas requisições, tente novamente mais tarde' },
-    standardHeaders: true,
-    legacyHeaders: false,
-    // Adiciona delay entre requisições
-    delayMs: 500
-});
-
-// Cache em memória com expiração
+// Cache em memória
 const cache = new Map();
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutos
 
@@ -39,12 +28,22 @@ const api = axios.create({
 
 const app = express();
 
+// Configuração de segurança
 app.use(cors());
 app.use(express.json());
 app.use(helmet({
     contentSecurityPolicy: false,
     crossOriginEmbedderPolicy: false
 }));
+
+// Rate limiting
+const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: isProduction ? 100 : 1000,
+    message: { error: 'Muitas requisições, tente novamente mais tarde' },
+    standardHeaders: true,
+    legacyHeaders: false
+});
 
 // Middleware de cache
 const cacheMiddleware = (req, res, next) => {
@@ -57,7 +56,7 @@ const cacheMiddleware = (req, res, next) => {
     next();
 };
 
-// Aplica rate limiting e cache às rotas da API
+// Aplicar rate limiting e cache às rotas da API
 app.use('/api', limiter);
 app.use('/api', cacheMiddleware);
 
@@ -137,3 +136,5 @@ const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
     console.log(`Servidor rodando em http://localhost:${PORT} em modo ${isProduction ? 'produção' : 'desenvolvimento'}`);
 });
+
+export default app;
