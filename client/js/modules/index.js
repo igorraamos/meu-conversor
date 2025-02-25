@@ -11,12 +11,13 @@ import {
 } from './utils.js';
 
 // Constantes
-const UPDATE_INTERVAL = 5 * 60 * 1000; // 5 minutos
+const UPDATE_INTERVAL = 30 * 1000; // 30 segundos
 const INITIAL_USD_VALUE = "1,00";
 const DEFAULT_CHART_PERIOD = '7d';
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 2000;
 const BATCH_DELAY = 1000; // Delay entre lotes de requisições
+const WS_URL = 'wss://api.exemplo.com/ws'; // Substitua pela URL do seu WebSocket
 
 // Cache de elementos DOM
 const elements = {
@@ -36,8 +37,117 @@ const state = {
     updateInterval: null,
     retryCount: 0,
     lastUpdateTime: null,
-    isUpdating: false
+    isUpdating: false,
+    wsConnection: null
 };
+
+// Classe WebSocket
+class WebSocketConnection {
+    constructor(url) {
+        this.url = url;
+        this.ws = null;
+        this.reconnectAttempts = 0;
+        this.maxReconnectAttempts = 5;
+        this.reconnectDelay = 1000;
+    }
+
+    connect() {
+        try {
+            this.ws = new WebSocket(this.url);
+
+            this.ws.onopen = () => {
+                console.log('WebSocket conectado');
+                this.reconnectAttempts = 0;
+                this.subscribe();
+            };
+
+            this.ws.onmessage = async (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.type === 'rate_update' && data.rate) {
+                        await handleRateUpdate(data);
+                    }
+                } catch (error) {
+                    console.error('Erro ao processar mensagem do WebSocket:', error);
+                }
+            };
+
+            this.ws.onclose = () => {
+                console.log('WebSocket desconectado');
+                this.reconnect();
+            };
+
+            this.ws.onerror = (error) => {
+                console.error('Erro no WebSocket:', error);
+            };
+        } catch (error) {
+            console.error('Erro ao conectar WebSocket:', error);
+            this.reconnect();
+        }
+    }
+
+    subscribe() {
+        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+            this.ws.send(JSON.stringify({ type: 'subscribe', channel: 'rates' }));
+        }
+    }
+
+    reconnect() {
+        if (this.reconnectAttempts < this.maxReconnectAttempts) {
+            this.reconnectAttempts++;
+            const delay = Math.min(this.reconnectDelay * Math.pow(2, this.reconnectAttempts), 30000);
+            
+            setTimeout(() => {
+                console.log(`Tentativa de reconexão ${this.reconnectAttempts}`);
+                this.connect();
+            }, delay);
+        }
+    }
+
+    disconnect() {
+        if (this.ws) {
+            this.ws.close();
+        }
+    }
+}
+
+/**
+ * Manipula atualizações de taxa recebidas via WebSocket
+ */
+async function handleRateUpdate(data) {
+    if (state.isUpdating) return;
+    state.isUpdating = true;
+
+    try {
+        const { rate, previousRate } = data;
+        
+        if (typeof rate !== 'number' || isNaN(rate)) {
+            throw new Error('Taxa de câmbio inválida');
+        }
+
+        // Atualizar histórico de taxas
+        if (state.lastRate !== rate) {
+            state.previousRate = state.lastRate;
+            state.lastRate = rate;
+        }
+
+        // Calcular e atualizar variação
+        const variation = calculateVariation(rate, previousRate || state.previousRate);
+        updateDollarInfo(rate, variation);
+
+        // Atualizar conversão
+        if (elements.usdInput && elements.brlInput) {
+            const usdValue = unformatNumber(elements.usdInput.value || INITIAL_USD_VALUE);
+            const brlValue = usdValue * rate;
+            elements.brlInput.value = formatNumber(brlValue);
+        }
+
+    } catch (error) {
+        console.error('Erro ao processar atualização de taxa:', error);
+    } finally {
+        state.isUpdating = false;
+    }
+}
 
 /**
  * Calcula a variação percentual entre duas taxas
@@ -227,6 +337,13 @@ function initializeChartButtons() {
  * Atualiza os dados periodicamente
  */
 async function startPeriodicUpdates() {
+    // Inicializar WebSocket
+    if (!state.wsConnection) {
+        state.wsConnection = new WebSocketConnection(WS_URL);
+        state.wsConnection.connect();
+    }
+
+    // Configurar fallback com polling
     if (state.updateInterval) {
         clearInterval(state.updateInterval);
     }
@@ -304,6 +421,9 @@ if (document.readyState === 'loading') {
 
 // Gerenciamento de visibilidade e limpeza
 window.addEventListener('beforeunload', () => {
+    if (state.wsConnection) {
+        state.wsConnection.disconnect();
+    }
     if (state.updateInterval) {
         clearInterval(state.updateInterval);
     }
@@ -311,6 +431,9 @@ window.addEventListener('beforeunload', () => {
 
 document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
+        if (state.wsConnection) {
+            state.wsConnection.disconnect();
+        }
         if (state.updateInterval) {
             clearInterval(state.updateInterval);
         }
